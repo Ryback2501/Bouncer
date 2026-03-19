@@ -5,7 +5,7 @@ import { createRole, updateRole, type Role } from '../../api/roles'
 import { Modal } from '../../components/shared/Modal'
 import { Input } from '../../components/shared/Input'
 import { Button } from '../../components/shared/Button'
-import { useToast } from '../../components/shared/Toast'
+import { useToast } from '../../components/shared/useToast'
 
 interface FormData { name: string; customId: string }
 
@@ -34,7 +34,7 @@ export function RoleForm({ open, onClose, appId, existing }: Props) {
       toast.success(existing ? 'Role updated' : 'Role created')
       onClose()
     },
-    onError: (err: any) => {
+    onError: (err: { response?: { data?: { error?: string } } }) => {
       const msg = err.response?.data?.error?.includes('customId')
         ? 'That ID is already used in this application'
         : 'Something went wrong'

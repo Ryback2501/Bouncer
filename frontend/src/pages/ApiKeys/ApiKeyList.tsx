@@ -10,7 +10,7 @@ import { ConfirmDialog } from '../../components/shared/ConfirmDialog'
 import { EmptyState } from '../../components/shared/EmptyState'
 import { CopyableCode } from '../../components/shared/CopyableCode'
 import { Modal } from '../../components/shared/Modal'
-import { useToast } from '../../components/shared/Toast'
+import { useToast } from '../../components/shared/useToast'
 import type { ApiKey } from '../../api/apiKeys'
 
 export function ApiKeyList() {

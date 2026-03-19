@@ -1,7 +1,10 @@
 import passport from "passport";
-import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import { Strategy as GoogleStrategy, Profile } from "passport-google-oauth20";
+import { Request } from "express";
 import { config } from "../config";
 import { findOrCreateUser } from "./index";
+
+type VerifyDone = (err: unknown, user?: Express.User | false) => void;
 
 export function setupGoogleStrategy() {
   if (!config.GOOGLE_CLIENT_ID || !config.GOOGLE_CLIENT_SECRET) return;
@@ -15,7 +18,7 @@ export function setupGoogleStrategy() {
         scope: ["profile", "email"],
         passReqToCallback: true,
       },
-      async (req: any, _accessToken: string, _refreshToken: string, profile: any, done: any) => {
+      async (req: Request, _accessToken: string, _refreshToken: string, profile: Profile, done: VerifyDone) => {
         try {
           const email = profile.emails?.[0]?.value ?? "";
           const user = await findOrCreateUser(

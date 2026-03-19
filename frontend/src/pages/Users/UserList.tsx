@@ -7,7 +7,7 @@ import { Button } from '../../components/shared/Button'
 import { ConfirmDialog } from '../../components/shared/ConfirmDialog'
 import { EmptyState } from '../../components/shared/EmptyState'
 import { Badge } from '../../components/shared/Badge'
-import { useToast } from '../../components/shared/Toast'
+import { useToast } from '../../components/shared/useToast'
 import { UserForm } from './UserForm'
 
 const providerColor: Record<string, 'blue' | 'green' | 'gray'> = {

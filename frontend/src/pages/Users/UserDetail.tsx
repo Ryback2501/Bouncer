@@ -8,7 +8,7 @@ import { Button } from '../../components/shared/Button'
 import { Badge } from '../../components/shared/Badge'
 import { ConfirmDialog } from '../../components/shared/ConfirmDialog'
 import { EmptyState } from '../../components/shared/EmptyState'
-import { useToast } from '../../components/shared/Toast'
+import { useToast } from '../../components/shared/useToast'
 import { AssignRoleModal } from './AssignRoleModal'
 import type { UserRole } from '../../api/users'
 
@@ -139,6 +139,7 @@ export function UserDetail() {
       </div>
 
       <AssignRoleModal
+        key={`${assignOpen}-${editingRole?.id ?? 'new'}`}
         open={assignOpen}
         onClose={() => { setAssignOpen(false); setEditingRole(null) }}
         userId={userId!}

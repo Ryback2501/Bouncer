@@ -1,8 +1,16 @@
 import passport from "passport";
 import AppleStrategy from "passport-apple";
+import { Request } from "express";
 import { config } from "../config";
 import { findOrCreateUser } from "./index";
 import { readFileSync } from "fs";
+
+type VerifyDone = (err: unknown, user?: Express.User | false) => void;
+interface AppleProfile {
+  id: string;
+  email?: string;
+  name?: { firstName?: string; lastName?: string };
+}
 
 export function setupAppleStrategy() {
   if (
@@ -24,7 +32,7 @@ export function setupAppleStrategy() {
         scope: ["name", "email"],
         passReqToCallback: true,
       },
-      async (req: any, _accessToken: string, _refreshToken: string, _idToken: object, profile: any, done: any) => {
+      async (req: Request, _accessToken: string, _refreshToken: string, _idToken: object, profile: AppleProfile, done: VerifyDone) => {
         try {
           const email = profile.email ?? "";
           const name = profile.name

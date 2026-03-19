@@ -5,7 +5,7 @@ import { createApplication, updateApplication, type Application } from '../../ap
 import { Modal } from '../../components/shared/Modal'
 import { Input } from '../../components/shared/Input'
 import { Button } from '../../components/shared/Button'
-import { useToast } from '../../components/shared/Toast'
+import { useToast } from '../../components/shared/useToast'
 
 interface FormData { name: string; customId: string }
 
@@ -33,7 +33,7 @@ export function ApplicationForm({ open, onClose, existing }: Props) {
       toast.success(existing ? 'Application updated' : 'Application created')
       onClose()
     },
-    onError: (err: any) => {
+    onError: (err: { response?: { data?: { error?: string } } }) => {
       const msg = err.response?.data?.error === 'customId already exists'
         ? 'That ID is already taken'
         : 'Something went wrong'

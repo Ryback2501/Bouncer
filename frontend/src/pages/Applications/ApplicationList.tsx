@@ -6,7 +6,7 @@ import { getApplications, deleteApplication, type Application } from '../../api/
 import { Button } from '../../components/shared/Button'
 import { ConfirmDialog } from '../../components/shared/ConfirmDialog'
 import { EmptyState } from '../../components/shared/EmptyState'
-import { useToast } from '../../components/shared/Toast'
+import { useToast } from '../../components/shared/useToast'
 import { ApplicationForm } from './ApplicationForm'
 
 export function ApplicationList() {

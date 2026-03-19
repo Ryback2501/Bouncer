@@ -11,7 +11,7 @@ import { ConfirmDialog } from '../../components/shared/ConfirmDialog'
 import { CopyableCode } from '../../components/shared/CopyableCode'
 import { Modal } from '../../components/shared/Modal'
 import { EmptyState } from '../../components/shared/EmptyState'
-import { useToast } from '../../components/shared/Toast'
+import { useToast } from '../../components/shared/useToast'
 
 function invitationStatus(inv: Invitation): { label: string; variant: 'green' | 'red' | 'yellow' | 'gray' } {
   if (inv.usedAt) return { label: 'Used', variant: 'gray' }

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getApplications } from '../../api/applications'
@@ -8,11 +8,10 @@ import { Modal } from '../../components/shared/Modal'
 import { Select } from '../../components/shared/Select'
 import { Input } from '../../components/shared/Input'
 import { Button } from '../../components/shared/Button'
-import { useToast } from '../../components/shared/Toast'
+import { useToast } from '../../components/shared/useToast'
 import type { UserRole } from '../../api/users'
 
 interface FormData {
-  applicationId: string
   roleId: string
   active: string
   expiredAt: string
@@ -29,44 +28,36 @@ interface Props {
 export function AssignRoleModal({ open, onClose, userId, existing, existingAppIds }: Props) {
   const qc = useQueryClient()
   const toast = useToast()
-  const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<FormData>()
-
-  const selectedAppId = watch('applicationId')
-
-  const { data: apps = [] } = useQuery({ queryKey: ['applications'], queryFn: getApplications })
-  const { data: roles = [] } = useQuery({
-    queryKey: ['roles', selectedAppId],
-    queryFn: () => getRoles(selectedAppId),
-    enabled: !!selectedAppId,
+  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+    defaultValues: existing
+      ? {
+          roleId: existing.roleId,
+          active: existing.active ? 'true' : 'false',
+          expiredAt: existing.expiredAt ? existing.expiredAt.slice(0, 10) : '',
+        }
+      : { roleId: '', active: 'true', expiredAt: '' },
   })
 
-  // Available apps: all apps, but when creating, exclude ones already assigned
+  const [selectedAppId, setSelectedAppId] = useState(existing?.applicationId ?? '')
+
+  const { data: apps = [] } = useQuery({ queryKey: ['applications'], queryFn: getApplications })
+
   const availableApps = existing
     ? apps
     : apps.filter(a => !existingAppIds.includes(a.id))
 
-  useEffect(() => {
-    if (open) {
-      reset(existing
-        ? {
-            applicationId: existing.applicationId,
-            roleId: existing.roleId,
-            active: existing.active ? 'true' : 'false',
-            expiredAt: existing.expiredAt ? existing.expiredAt.slice(0, 10) : '',
-          }
-        : {
-            applicationId: availableApps[0]?.id ?? '',
-            roleId: '',
-            active: 'true',
-            expiredAt: '',
-          }
-      )
-    }
-  }, [open, existing, availableApps.length])
+  // Derive the effective app ID — falls back to first available when nothing is selected yet
+  const effectiveAppId = selectedAppId || availableApps[0]?.id || ''
+
+  const { data: roles = [] } = useQuery({
+    queryKey: ['roles', effectiveAppId],
+    queryFn: () => getRoles(effectiveAppId),
+    enabled: !!effectiveAppId,
+  })
 
   const mutation = useMutation({
     mutationFn: (data: FormData) =>
-      assignRole(userId, data.applicationId, {
+      assignRole(userId, effectiveAppId, {
         roleId: data.roleId,
         active: data.active === 'true',
         expiredAt: data.expiredAt || null,
@@ -90,8 +81,8 @@ export function AssignRoleModal({ open, onClose, userId, existing, existingAppId
       <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-4">
         <Select
           label="Application"
-          {...register('applicationId', { required: 'Application is required' })}
-          error={errors.applicationId?.message}
+          value={effectiveAppId}
+          onChange={e => setSelectedAppId(e.target.value)}
           disabled={!!existing}
         >
           {availableApps.map(app => (

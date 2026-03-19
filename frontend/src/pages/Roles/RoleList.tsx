@@ -7,7 +7,7 @@ import { getApplication } from '../../api/applications'
 import { Button } from '../../components/shared/Button'
 import { ConfirmDialog } from '../../components/shared/ConfirmDialog'
 import { EmptyState } from '../../components/shared/EmptyState'
-import { useToast } from '../../components/shared/Toast'
+import { useToast } from '../../components/shared/useToast'
 import { RoleForm } from './RoleForm'
 
 export function RoleList() {

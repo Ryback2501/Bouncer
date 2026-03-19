@@ -2,7 +2,7 @@ import { User as PrismaUser, Application as PrismaApplication } from "@prisma/cl
 
 declare global {
   namespace Express {
-    interface User extends PrismaUser {}
+    interface User extends PrismaUser { [key: string]: unknown }
     interface Request {
       bouncerApp?: PrismaApplication;
     }

@@ -20,8 +20,8 @@ router.post("/", async (req: Request, res: Response) => {
   if (!name || !sub || !provider) { res.status(400).json({ error: "name, sub and provider are required" }); return; }
   try {
     res.status(201).json(await svc.createUser({ name, sub, provider }));
-  } catch (e: any) {
-    if (e.code === "P2002") { res.status(409).json({ error: "A user with this sub+provider already exists" }); return; }
+  } catch (e) {
+    if ((e as { code?: string }).code ==="P2002") { res.status(409).json({ error: "A user with this sub+provider already exists" }); return; }
     throw e;
   }
 });
@@ -38,9 +38,9 @@ router.patch("/:userId", async (req: Request, res: Response) => {
   const { name, sub, provider } = req.body;
   try {
     res.json(await svc.updateUser(req.params.userId, { name, sub, provider }));
-  } catch (e: any) {
-    if (e.code === "P2025") { res.status(404).json({ error: "not_found" }); return; }
-    if (e.code === "P2002") { res.status(409).json({ error: "A user with this sub+provider already exists" }); return; }
+  } catch (e) {
+    if ((e as { code?: string }).code ==="P2025") { res.status(404).json({ error: "not_found" }); return; }
+    if ((e as { code?: string }).code ==="P2002") { res.status(409).json({ error: "A user with this sub+provider already exists" }); return; }
     throw e;
   }
 });
@@ -51,8 +51,8 @@ router.delete("/:userId", async (req: Request, res: Response) => {
   try {
     await svc.deleteUser(req.params.userId);
     res.status(204).send();
-  } catch (e: any) {
-    if (e.code === "P2025") { res.status(404).json({ error: "not_found" }); return; }
+  } catch (e) {
+    if ((e as { code?: string }).code ==="P2025") { res.status(404).json({ error: "not_found" }); return; }
     throw e;
   }
 });

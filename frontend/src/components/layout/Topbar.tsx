@@ -1,6 +1,6 @@
 import { Menu, LogOut, ChevronDown } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 
 interface TopbarProps {
   onMenuClick: () => void

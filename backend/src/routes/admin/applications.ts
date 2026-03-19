@@ -13,8 +13,8 @@ router.post("/", async (req: Request, res: Response) => {
   if (!name || !customId) { res.status(400).json({ error: "name and customId are required" }); return; }
   try {
     res.status(201).json(await svc.createApplication({ name, customId }));
-  } catch (e: any) {
-    if (e.code === "P2002") { res.status(409).json({ error: "customId already exists" }); return; }
+  } catch (e) {
+    if ((e as { code?: string }).code === "P2002") { res.status(409).json({ error: "customId already exists" }); return; }
     throw e;
   }
 });
@@ -31,9 +31,9 @@ router.patch("/:appId", async (req: Request, res: Response) => {
   const { name, customId } = req.body;
   try {
     res.json(await svc.updateApplication(req.params.appId, { name, customId }));
-  } catch (e: any) {
-    if (e.code === "P2025") { res.status(404).json({ error: "not_found" }); return; }
-    if (e.code === "P2002") { res.status(409).json({ error: "customId already exists" }); return; }
+  } catch (e) {
+    if ((e as { code?: string }).code ==="P2025") { res.status(404).json({ error: "not_found" }); return; }
+    if ((e as { code?: string }).code === "P2002") { res.status(409).json({ error: "customId already exists" }); return; }
     throw e;
   }
 });
@@ -44,8 +44,8 @@ router.delete("/:appId", async (req: Request, res: Response) => {
   try {
     await svc.deleteApplication(req.params.appId);
     res.status(204).send();
-  } catch (e: any) {
-    if (e.code === "P2025") { res.status(404).json({ error: "not_found" }); return; }
+  } catch (e) {
+    if ((e as { code?: string }).code ==="P2025") { res.status(404).json({ error: "not_found" }); return; }
     throw e;
   }
 });

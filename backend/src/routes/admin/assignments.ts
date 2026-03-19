@@ -18,8 +18,8 @@ router.put("/:appId", async (req: Request, res: Response) => {
         expiredAt: expiredAt ? new Date(expiredAt) : null,
       })
     );
-  } catch (e: any) {
-    if (e.code === "P2003") { res.status(400).json({ error: "invalid userId, applicationId or roleId" }); return; }
+  } catch (e) {
+    if ((e as { code?: string }).code ==="P2003") { res.status(400).json({ error: "invalid userId, applicationId or roleId" }); return; }
     throw e;
   }
 });
@@ -28,8 +28,8 @@ router.delete("/:appId", async (req: Request, res: Response) => {
   try {
     await svc.removeRole(req.params.userId, req.params.appId);
     res.status(204).send();
-  } catch (e: any) {
-    if (e.code === "P2025") { res.status(404).json({ error: "not_found" }); return; }
+  } catch (e) {
+    if ((e as { code?: string }).code ==="P2025") { res.status(404).json({ error: "not_found" }); return; }
     throw e;
   }
 });
