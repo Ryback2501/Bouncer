@@ -9,3 +9,7 @@ Bouncer is a Role-Based Access Control (RBAC) service with an admin UI and a pub
 - **Users** — manage users identified by their OAuth `sub` and provider.
 - **Assignments** — assign a role to a user within an application, with optional expiry.
 - **Access API** — connected apps call `GET /api/v1/access?sub=<sub>` with an API key to check whether a user has an active role, getting back the role details or a clear error (`user_not_found` / `role_inactive`).
+
+## Admin access
+
+The Bouncer admin portal is itself modelled as an application inside Bouncer. The first person to sign in via OAuth becomes the global administrator. After that, new admins can only be added via single-use invitation links generated from the Admin Access page.
