@@ -6,8 +6,6 @@ on:
     branches: [dev]
     types: [completed]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   promote:
