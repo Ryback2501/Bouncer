@@ -11,6 +11,7 @@ on:
         required: false
         default: ''
 
+
 jobs:
   create-pr:
     name: Bump version and create release PR
@@ -21,7 +22,7 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
           ref: test
