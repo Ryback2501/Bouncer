@@ -14,14 +14,67 @@ jobs:
     permissions:
       contents: write
 
+    env:
+      # Required for prisma generate and config.ts validation during build
+      DATABASE_URL: postgresql://build:build@localhost:5432/build
+      SESSION_SECRET: build-secret-placeholder-not-used-at-runtime
+      FRONTEND_URL: http://localhost:5173
+      NODE_ENV: production
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Read version from package.json
         id: version
         run: echo "version=$(jq -r '.version' backend/package.json)" >> $GITHUB_OUTPUT
+
+      # ── Backend ────────────────────────────────────────────────────────────
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Package backend artifact
+        run: |
+          mkdir -p artifacts
+          cd backend
+          zip -r ../artifacts/bouncer-backend-v${{ steps.version.outputs.version }}.zip \
+            dist/ \
+            package.json \
+            package-lock.json \
+            prisma/schema.prisma \
+            prisma/migrations/
+
+      # ── Frontend ───────────────────────────────────────────────────────────
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Package frontend artifact
+        run: |
+          cd frontend
+          zip -r ../artifacts/bouncer-frontend-v${{ steps.version.outputs.version }}.zip dist/
+
+      # ── Tag & Release ──────────────────────────────────────────────────────
 
       - name: Create git tag
         run: |
@@ -38,4 +91,6 @@ jobs:
           echo "$PR_BODY" > /tmp/release_notes.md
           gh release create "v${{ steps.version.outputs.version }}" \
             --title "v${{ steps.version.outputs.version }}" \
-            --notes-file /tmp/release_notes.md
+            --notes-file /tmp/release_notes.md \
+            artifacts/bouncer-backend-v${{ steps.version.outputs.version }}.zip \
+            artifacts/bouncer-frontend-v${{ steps.version.outputs.version }}.zip
