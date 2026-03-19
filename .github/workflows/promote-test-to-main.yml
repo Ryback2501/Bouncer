@@ -1,0 +1,44 @@
+name: Promote test to main (release PR)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: 'Release notes (optional)'
+        required: false
+        default: ''
+
+jobs:
+  create-pr:
+    name: Create release PR
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create release PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BODY="Manually triggered release PR from \`test\` → \`main\`."
+          if [ -n "${{ inputs.release_notes }}" ]; then
+            BODY="$BODY
+
+          **Release notes:** ${{ inputs.release_notes }}"
+          fi
+
+          EXISTING=$(gh pr list --base main --head test --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            echo "Release PR #$EXISTING already exists — skipping"
+          else
+            gh pr create \
+              --base main --head test \
+              --title "Release: merge test into main" \
+              --body "$BODY"
+          fi
