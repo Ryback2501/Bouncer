@@ -13,9 +13,7 @@ build/
 *.log
 npm-debug.log*
 
-# Prisma
-backend/prisma/migrations/*.sql
-# (keep migrations tracked, ignore generated client)
+# Prisma (migrations are tracked; only ignore generated client)
 backend/node_modules/
 frontend/node_modules/
 
