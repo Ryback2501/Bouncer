@@ -45,6 +45,10 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
       - name: Type check
         working-directory: backend
         run: npx tsc --noEmit
@@ -52,10 +56,6 @@ jobs:
       - name: Lint
         working-directory: backend
         run: npm run lint
-
-      - name: Generate Prisma client
-        working-directory: backend
-        run: npx prisma generate
 
       - name: Run database migrations
         working-directory: backend
