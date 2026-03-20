@@ -60,7 +60,7 @@ describe('UserDetail', () => {
   })
 
   it('shows user not found when user is missing', async () => {
-    vi.mocked(getUser).mockResolvedValue(undefined as never)
+    vi.mocked(getUser).mockResolvedValue(null as never)
     renderWithProviders(<UserDetail />, { route: '/users/u1', path: '/users/:userId' })
     await waitFor(() => expect(screen.getByText('User not found.')).toBeInTheDocument())
   })

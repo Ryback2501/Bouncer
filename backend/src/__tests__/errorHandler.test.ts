@@ -1,4 +1,4 @@
-import { vi, describe, it, expect } from 'vitest'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { errorHandler } from '../middleware/errorHandler'
 import type { Request, Response, NextFunction } from 'express'
 
@@ -12,6 +12,8 @@ const req = {} as Request
 const next = vi.fn() as unknown as NextFunction
 
 describe('errorHandler', () => {
+  beforeEach(() => vi.spyOn(console, 'error').mockImplementation(() => {}))
+  afterEach(() => vi.restoreAllMocks())
   it('returns 500 with error message for Error instances', () => {
     const res = makeRes()
     errorHandler(new Error('Something went wrong'), req, res, next)
