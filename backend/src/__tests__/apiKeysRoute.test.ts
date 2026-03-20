@@ -26,7 +26,7 @@ describe('GET /applications/:appId/api-keys', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns api keys for an application', async () => {
-    vi.mocked(svc.listApiKeys).mockResolvedValue([mockKey] as any)
+    vi.mocked(svc.listApiKeys).mockResolvedValue([mockKey] as unknown as Awaited<ReturnType<typeof svc.listApiKeys>>)
     const res = await request(makeApp()).get('/app1/api-keys')
     expect(res.status).toBe(200)
     expect(res.body).toHaveLength(1)
@@ -38,7 +38,7 @@ describe('POST /applications/:appId/api-keys', () => {
 
   it('creates api key and returns 201 with rawKey', async () => {
     const newKey = { ...mockKey, rawKey: 'bncr_abc123' }
-    vi.mocked(svc.createApiKey).mockResolvedValue(newKey as any)
+    vi.mocked(svc.createApiKey).mockResolvedValue(newKey as unknown as Awaited<ReturnType<typeof svc.createApiKey>>)
     const res = await request(makeApp()).post('/app1/api-keys').send({ label: 'prod' })
     expect(res.status).toBe(201)
     expect(res.body.rawKey).toBe('bncr_abc123')
@@ -49,7 +49,7 @@ describe('DELETE /applications/:appId/api-keys/:keyId', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns 204 on successful deletion', async () => {
-    vi.mocked(svc.deleteApiKey).mockResolvedValue({} as any)
+    vi.mocked(svc.deleteApiKey).mockResolvedValue({} as unknown as Awaited<ReturnType<typeof svc.deleteApiKey>>)
     const res = await request(makeApp()).delete('/app1/api-keys/k1')
     expect(res.status).toBe(204)
   })

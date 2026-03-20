@@ -35,14 +35,14 @@ describe('GET /users', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns paginated user list', async () => {
-    vi.mocked(svc.listUsers).mockResolvedValue({ total: 1, page: 1, limit: 20, users: [mockUser] } as any)
+    vi.mocked(svc.listUsers).mockResolvedValue({ total: 1, page: 1, limit: 20, users: [mockUser] } as unknown as Awaited<ReturnType<typeof svc.listUsers>>)
     const res = await request(makeApp()).get('/')
     expect(res.status).toBe(200)
     expect(res.body.users).toHaveLength(1)
   })
 
   it('passes search, page, limit query params to service', async () => {
-    vi.mocked(svc.listUsers).mockResolvedValue({ total: 0, page: 2, limit: 10, users: [] } as any)
+    vi.mocked(svc.listUsers).mockResolvedValue({ total: 0, page: 2, limit: 10, users: [] } as unknown as Awaited<ReturnType<typeof svc.listUsers>>)
     await request(makeApp()).get('/?search=alice&page=2&limit=10')
     expect(svc.listUsers).toHaveBeenCalledWith({ search: 'alice', page: 2, limit: 10 })
   })
@@ -52,7 +52,7 @@ describe('POST /users', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('creates user and returns 201', async () => {
-    vi.mocked(svc.createUser).mockResolvedValue(mockUser as any)
+    vi.mocked(svc.createUser).mockResolvedValue(mockUser as unknown as Awaited<ReturnType<typeof svc.createUser>>)
     const res = await request(makeApp()).post('/').send({ name: 'Alice', sub: '123', provider: 'google' })
     expect(res.status).toBe(201)
     expect(res.body.name).toBe('Alice')
@@ -74,7 +74,7 @@ describe('GET /users/:userId', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns user by id', async () => {
-    vi.mocked(svc.getUser).mockResolvedValue({ ...mockUser, userRoles: [] } as any)
+    vi.mocked(svc.getUser).mockResolvedValue({ ...mockUser, userRoles: [] } as unknown as Awaited<ReturnType<typeof svc.getUser>>)
     const res = await request(makeApp()).get('/u1')
     expect(res.status).toBe(200)
   })
@@ -97,7 +97,7 @@ describe('PATCH /users/:userId', () => {
 
   it('updates user when not global admin', async () => {
     p.findUnique.mockResolvedValue(mockUser)
-    vi.mocked(svc.updateUser).mockResolvedValue({ ...mockUser, name: 'Bob' } as any)
+    vi.mocked(svc.updateUser).mockResolvedValue({ ...mockUser, name: 'Bob' } as unknown as Awaited<ReturnType<typeof svc.updateUser>>)
     const res = await request(makeApp()).patch('/u1').send({ name: 'Bob' })
     expect(res.status).toBe(200)
     expect(res.body.name).toBe('Bob')
@@ -122,7 +122,7 @@ describe('DELETE /users/:userId', () => {
 
   it('returns 204 on successful deletion', async () => {
     p.findUnique.mockResolvedValue(mockUser)
-    vi.mocked(svc.deleteUser).mockResolvedValue({} as any)
+    vi.mocked(svc.deleteUser).mockResolvedValue({} as unknown as Awaited<ReturnType<typeof svc.deleteUser>>)
     const res = await request(makeApp()).delete('/u1')
     expect(res.status).toBe(204)
   })

@@ -1,6 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import express from 'express'
 import request from 'supertest'
+import type { Application, Role } from '@prisma/client'
 
 vi.mock('../prisma', () => ({
   prisma: {
@@ -34,8 +35,8 @@ describe('GET /admins', () => {
 
   it('returns list of bouncer admins', async () => {
     vi.mocked(ensureBouncerDefaults).mockResolvedValue({
-      app: { id: 'bouncer-app-id' } as any,
-      role: { id: 'admin-role-id' } as any,
+      app: { id: 'bouncer-app-id' } as unknown as Application,
+      role: { id: 'admin-role-id' } as unknown as Role,
     })
     p.findMany.mockResolvedValue([{ user: mockAdmin }])
 
@@ -48,8 +49,8 @@ describe('GET /admins', () => {
 
   it('returns empty list when no admins', async () => {
     vi.mocked(ensureBouncerDefaults).mockResolvedValue({
-      app: { id: 'bouncer-app-id' } as any,
-      role: { id: 'admin-role-id' } as any,
+      app: { id: 'bouncer-app-id' } as unknown as Application,
+      role: { id: 'admin-role-id' } as unknown as Role,
     })
     p.findMany.mockResolvedValue([])
 

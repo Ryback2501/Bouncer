@@ -1,6 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import express from 'express'
 import request from 'supertest'
+import type { Request, Response, NextFunction } from 'express'
 
 vi.mock('../services/invitationService', () => ({
   listInvitations: vi.fn(),
@@ -23,7 +24,10 @@ const mockUser = { id: 'u1', name: 'Alice' }
 function makeApp() {
   const app = express()
   app.use(express.json())
-  app.use((req: any, _res: any, next: any) => { req.user = mockUser; next() })
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    req.user = mockUser as unknown as Express.User
+    next()
+  })
   app.use('/', router)
   return app
 }
@@ -32,7 +36,7 @@ describe('GET /invitations', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns list of invitations', async () => {
-    vi.mocked(svc.listInvitations).mockResolvedValue([mockInvitation] as any)
+    vi.mocked(svc.listInvitations).mockResolvedValue([mockInvitation] as unknown as Awaited<ReturnType<typeof svc.listInvitations>>)
     const res = await request(makeApp()).get('/')
     expect(res.status).toBe(200)
     expect(res.body).toHaveLength(1)
@@ -43,7 +47,7 @@ describe('POST /invitations', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('creates invitation and returns 201', async () => {
-    vi.mocked(svc.createInvitation).mockResolvedValue(mockInvitation as any)
+    vi.mocked(svc.createInvitation).mockResolvedValue(mockInvitation as unknown as Awaited<ReturnType<typeof svc.createInvitation>>)
     const res = await request(makeApp()).post('/')
     expect(res.status).toBe(201)
     expect(res.body.inviteUrl).toBe(mockInvitation.inviteUrl)
@@ -55,7 +59,7 @@ describe('DELETE /invitations/:id', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns 204 on successful deletion', async () => {
-    vi.mocked(svc.deleteInvitation).mockResolvedValue({} as any)
+    vi.mocked(svc.deleteInvitation).mockResolvedValue({} as unknown as Awaited<ReturnType<typeof svc.deleteInvitation>>)
     const res = await request(makeApp()).delete('/i1')
     expect(res.status).toBe(204)
   })

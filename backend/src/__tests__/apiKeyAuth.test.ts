@@ -74,7 +74,7 @@ describe('apiKeyAuth', () => {
       where: { keyHash },
       include: { application: true },
     })
-    expect((req as any).bouncerApp).toEqual(mockApp)
+    expect(req.bouncerApp).toEqual(mockApp)
     expect(next).toHaveBeenCalledOnce()
   })
 })

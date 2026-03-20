@@ -1,6 +1,8 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import express from 'express'
 import request from 'supertest'
+import type { Request, Response, NextFunction } from 'express'
+import type { Application } from '@prisma/client'
 
 vi.mock('../prisma', () => ({
   prisma: {
@@ -10,8 +12,8 @@ vi.mock('../prisma', () => ({
 }))
 
 vi.mock('../middleware/apiKeyAuth', () => ({
-  apiKeyAuth: (req: any, _res: any, next: any) => {
-    req.bouncerApp = { id: 'app1', name: 'My App', customId: 'my-app' }
+  apiKeyAuth: (req: Request, _res: Response, next: NextFunction) => {
+    req.bouncerApp = { id: 'app1', name: 'My App', customId: 'my-app' } as unknown as Application
     next()
   },
 }))

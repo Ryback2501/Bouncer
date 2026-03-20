@@ -26,7 +26,7 @@ describe('GET /users/:userId/roles', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns user role assignments', async () => {
-    vi.mocked(svc.getUserRoles).mockResolvedValue([mockUserRole] as any)
+    vi.mocked(svc.getUserRoles).mockResolvedValue([mockUserRole] as unknown as Awaited<ReturnType<typeof svc.getUserRoles>>)
     const res = await request(makeApp()).get('/u1/roles')
     expect(res.status).toBe(200)
     expect(res.body).toHaveLength(1)
@@ -37,7 +37,7 @@ describe('PUT /users/:userId/roles/:appId', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('assigns a role and returns the assignment', async () => {
-    vi.mocked(svc.assignRole).mockResolvedValue(mockUserRole as any)
+    vi.mocked(svc.assignRole).mockResolvedValue(mockUserRole as unknown as Awaited<ReturnType<typeof svc.assignRole>>)
     const res = await request(makeApp()).put('/u1/roles/app1').send({ roleId: 'r1' })
     expect(res.status).toBe(200)
     expect(res.body.roleId).toBe('r1')
@@ -59,7 +59,7 @@ describe('DELETE /users/:userId/roles/:appId', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns 204 on successful removal', async () => {
-    vi.mocked(svc.removeRole).mockResolvedValue({} as any)
+    vi.mocked(svc.removeRole).mockResolvedValue({} as unknown as Awaited<ReturnType<typeof svc.removeRole>>)
     const res = await request(makeApp()).delete('/u1/roles/app1')
     expect(res.status).toBe(204)
   })

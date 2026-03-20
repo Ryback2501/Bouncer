@@ -1,6 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import express from 'express'
 import request from 'supertest'
+import type { Application, Role } from '@prisma/client'
 
 vi.mock('../services/applicationService', () => ({
   listApplications: vi.fn(),
@@ -28,11 +29,18 @@ function makeApp() {
   return app
 }
 
+function mockDefaults() {
+  vi.mocked(ensureBouncerDefaults).mockResolvedValue({
+    app: { id: BOUNCER_ID } as unknown as Application,
+    role: {} as unknown as Role,
+  })
+}
+
 describe('GET /applications', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns list of applications', async () => {
-    vi.mocked(svc.listApplications).mockResolvedValue([mockApp] as any)
+    vi.mocked(svc.listApplications).mockResolvedValue([mockApp] as unknown as Awaited<ReturnType<typeof svc.listApplications>>)
     const res = await request(makeApp()).get('/')
     expect(res.status).toBe(200)
     expect(res.body).toEqual([mockApp])
@@ -43,7 +51,7 @@ describe('POST /applications', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('creates application and returns 201', async () => {
-    vi.mocked(svc.createApplication).mockResolvedValue(mockApp as any)
+    vi.mocked(svc.createApplication).mockResolvedValue(mockApp as unknown as Awaited<ReturnType<typeof svc.createApplication>>)
     const res = await request(makeApp()).post('/').send({ name: 'My App', customId: 'my-app' })
     expect(res.status).toBe(201)
     expect(res.body).toEqual(mockApp)
@@ -65,7 +73,7 @@ describe('GET /applications/:appId', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns application by id', async () => {
-    vi.mocked(svc.getApplication).mockResolvedValue(mockApp as any)
+    vi.mocked(svc.getApplication).mockResolvedValue(mockApp as unknown as Awaited<ReturnType<typeof svc.getApplication>>)
     const res = await request(makeApp()).get('/app1')
     expect(res.status).toBe(200)
     expect(res.body).toEqual(mockApp)
@@ -82,28 +90,28 @@ describe('PATCH /applications/:appId', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns 403 when patching the bouncer application', async () => {
-    vi.mocked(ensureBouncerDefaults).mockResolvedValue({ app: { id: BOUNCER_ID } as any, role: {} as any })
+    mockDefaults()
     const res = await request(makeApp()).patch(`/${BOUNCER_ID}`).send({ name: 'X' })
     expect(res.status).toBe(403)
   })
 
   it('updates application and returns it', async () => {
-    vi.mocked(ensureBouncerDefaults).mockResolvedValue({ app: { id: BOUNCER_ID } as any, role: {} as any })
-    vi.mocked(svc.updateApplication).mockResolvedValue({ ...mockApp, name: 'Updated' } as any)
+    mockDefaults()
+    vi.mocked(svc.updateApplication).mockResolvedValue({ ...mockApp, name: 'Updated' } as unknown as Awaited<ReturnType<typeof svc.updateApplication>>)
     const res = await request(makeApp()).patch('/app1').send({ name: 'Updated' })
     expect(res.status).toBe(200)
     expect(res.body.name).toBe('Updated')
   })
 
   it('returns 404 when application not found', async () => {
-    vi.mocked(ensureBouncerDefaults).mockResolvedValue({ app: { id: BOUNCER_ID } as any, role: {} as any })
+    mockDefaults()
     vi.mocked(svc.updateApplication).mockRejectedValue({ code: 'P2025' })
     const res = await request(makeApp()).patch('/app1').send({ name: 'X' })
     expect(res.status).toBe(404)
   })
 
   it('returns 409 on duplicate customId', async () => {
-    vi.mocked(ensureBouncerDefaults).mockResolvedValue({ app: { id: BOUNCER_ID } as any, role: {} as any })
+    mockDefaults()
     vi.mocked(svc.updateApplication).mockRejectedValue({ code: 'P2002' })
     const res = await request(makeApp()).patch('/app1').send({ customId: 'taken' })
     expect(res.status).toBe(409)
@@ -114,20 +122,20 @@ describe('DELETE /applications/:appId', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns 403 when deleting the bouncer application', async () => {
-    vi.mocked(ensureBouncerDefaults).mockResolvedValue({ app: { id: BOUNCER_ID } as any, role: {} as any })
+    mockDefaults()
     const res = await request(makeApp()).delete(`/${BOUNCER_ID}`)
     expect(res.status).toBe(403)
   })
 
   it('returns 204 on successful deletion', async () => {
-    vi.mocked(ensureBouncerDefaults).mockResolvedValue({ app: { id: BOUNCER_ID } as any, role: {} as any })
-    vi.mocked(svc.deleteApplication).mockResolvedValue({} as any)
+    mockDefaults()
+    vi.mocked(svc.deleteApplication).mockResolvedValue({} as unknown as Awaited<ReturnType<typeof svc.deleteApplication>>)
     const res = await request(makeApp()).delete('/app1')
     expect(res.status).toBe(204)
   })
 
   it('returns 404 when application not found', async () => {
-    vi.mocked(ensureBouncerDefaults).mockResolvedValue({ app: { id: BOUNCER_ID } as any, role: {} as any })
+    mockDefaults()
     vi.mocked(svc.deleteApplication).mockRejectedValue({ code: 'P2025' })
     const res = await request(makeApp()).delete('/app1')
     expect(res.status).toBe(404)
