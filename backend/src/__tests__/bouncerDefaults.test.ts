@@ -10,8 +10,8 @@ vi.mock('../prisma', () => ({
 import { prisma } from '../prisma'
 import { ensureBouncerDefaults } from '../lib/bouncerDefaults'
 
-const appMock = prisma.application as Record<string, ReturnType<typeof vi.fn>>
-const roleMock = prisma.role as Record<string, ReturnType<typeof vi.fn>>
+const appMock = prisma.application as unknown as Record<string, ReturnType<typeof vi.fn>>
+const roleMock = prisma.role as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 const mockApp = { id: 'bouncer-app', name: 'Bouncer', customId: 'bouncer', createdAt: new Date(), updatedAt: new Date() }
 const mockRole = { id: 'admin-role', name: 'Admin', customId: 'admin', applicationId: 'bouncer-app', createdAt: new Date(), updatedAt: new Date() }

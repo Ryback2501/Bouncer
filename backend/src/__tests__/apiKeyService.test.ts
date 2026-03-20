@@ -14,7 +14,7 @@ vi.mock('../prisma', () => ({
 import { prisma } from '../prisma'
 import { listApiKeys, createApiKey, deleteApiKey } from '../services/apiKeyService'
 
-const p = prisma.apiKey as Record<string, ReturnType<typeof vi.fn>>
+const p = prisma.apiKey as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 describe('apiKeyService', () => {
   beforeEach(() => vi.clearAllMocks())

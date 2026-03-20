@@ -19,7 +19,7 @@ import { getApplications } from '../api/applications'
 import { getRoles } from '../api/roles'
 import { assignRole } from '../api/assignments'
 
-const mockApp = { id: 'app1', name: 'My App', customId: 'myapp', description: null, createdAt: '' }
+const mockApp = { id: 'app1', name: 'My App', customId: 'myapp', description: null, createdAt: '', updatedAt: '' }
 const mockRole = { id: 'r1', name: 'Editor', customId: 'editor', description: null, applicationId: 'app1', createdAt: '' }
 
 describe('AssignRoleModal', () => {

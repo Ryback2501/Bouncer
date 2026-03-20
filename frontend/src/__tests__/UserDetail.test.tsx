@@ -31,7 +31,7 @@ const mockUserRole = {
   active: true,
   expiredAt: null,
   assignedAt: '',
-  application: { id: 'app1', name: 'My App', customId: 'myapp', description: null, createdAt: '' },
+  application: { id: 'app1', name: 'My App', customId: 'myapp', description: null, createdAt: '', updatedAt: '' },
   role: { id: 'r1', name: 'Editor', customId: 'editor', description: null, applicationId: 'app1', createdAt: '' },
 }
 

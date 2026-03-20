@@ -19,8 +19,8 @@ vi.mock('../middleware/apiKeyAuth', () => ({
 import { prisma } from '../prisma'
 import router from '../routes/api/v1/access'
 
-const pu = prisma.user as Record<string, ReturnType<typeof vi.fn>>
-const pur = prisma.userRole as Record<string, ReturnType<typeof vi.fn>>
+const pu = prisma.user as unknown as Record<string, ReturnType<typeof vi.fn>>
+const pur = prisma.userRole as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 const mockUser = { id: 'u1', sub: '123', provider: 'google' }
 const mockRole = { id: 'r1', name: 'Editor', customId: 'editor' }

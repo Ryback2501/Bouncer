@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 
 vi.mock('../api/client', () => ({
   default: {
@@ -18,7 +18,7 @@ import { getApiKeys, createApiKey, deleteApiKey } from '../api/apiKeys'
 import { getInvitations, createInvitation, deleteInvitation, getAdmins } from '../api/invitations'
 import { getUserRoles, assignRole, removeRole } from '../api/assignments'
 
-const c = vi.mocked(client)
+const c = client as unknown as { get: Mock; post: Mock; patch: Mock; put: Mock; delete: Mock }
 
 describe('Applications API', () => {
   beforeEach(() => vi.clearAllMocks())

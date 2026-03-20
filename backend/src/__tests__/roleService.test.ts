@@ -15,7 +15,7 @@ vi.mock('../prisma', () => ({
 import { prisma } from '../prisma'
 import { listRoles, getRole, createRole, updateRole, deleteRole } from '../services/roleService'
 
-const p = prisma.role as Record<string, ReturnType<typeof vi.fn>>
+const p = prisma.role as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 describe('roleService', () => {
   beforeEach(() => vi.clearAllMocks())

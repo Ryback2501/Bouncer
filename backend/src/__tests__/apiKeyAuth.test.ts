@@ -14,7 +14,7 @@ import { prisma } from '../prisma'
 import { apiKeyAuth } from '../middleware/apiKeyAuth'
 import type { Request, Response, NextFunction } from 'express'
 
-const p = prisma.apiKey as Record<string, ReturnType<typeof vi.fn>>
+const p = prisma.apiKey as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 function makeReq(authHeader?: string): Request {
   return { headers: { authorization: authHeader } } as unknown as Request

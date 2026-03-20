@@ -16,7 +16,7 @@ import { prisma } from '../prisma'
 import { ensureBouncerDefaults } from '../lib/bouncerDefaults'
 import router from '../routes/admin/admins'
 
-const p = prisma.userRole as Record<string, ReturnType<typeof vi.fn>>
+const p = prisma.userRole as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 const mockAdmin = {
   id: 'u1', name: 'Alice', email: 'alice@test.com', provider: 'google', isGlobalAdmin: true, createdAt: new Date(),

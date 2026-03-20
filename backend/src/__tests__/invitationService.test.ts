@@ -13,7 +13,7 @@ vi.mock('../prisma', () => ({
 import { prisma } from '../prisma'
 import { createInvitation, listInvitations, deleteInvitation } from '../services/invitationService'
 
-const p = prisma.invitation as Record<string, ReturnType<typeof vi.fn>>
+const p = prisma.invitation as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 describe('invitationService', () => {
   beforeEach(() => vi.clearAllMocks())

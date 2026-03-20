@@ -18,7 +18,7 @@ import {
   updateApplication, deleteApplication,
 } from '../services/applicationService'
 
-const p = prisma.application as Record<string, ReturnType<typeof vi.fn>>
+const p = prisma.application as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 describe('applicationService', () => {
   beforeEach(() => vi.clearAllMocks())

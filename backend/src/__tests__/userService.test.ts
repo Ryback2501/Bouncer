@@ -16,7 +16,7 @@ vi.mock('../prisma', () => ({
 import { prisma } from '../prisma'
 import { listUsers, getUser, createUser, updateUser, deleteUser } from '../services/userService'
 
-const p = prisma.user as Record<string, ReturnType<typeof vi.fn>>
+const p = prisma.user as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 const mockUser = { id: 'u1', name: 'Alice', sub: '123', provider: 'google', isGlobalAdmin: false }
 

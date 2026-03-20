@@ -16,7 +16,7 @@ vi.mock('../api/applications', () => ({
 import { getApiKeys, createApiKey, deleteApiKey } from '../api/apiKeys'
 import { getApplication } from '../api/applications'
 
-const mockApp = { id: 'app1', name: 'My App', customId: 'myapp', description: null, createdAt: '' }
+const mockApp = { id: 'app1', name: 'My App', customId: 'myapp', description: null, createdAt: '', updatedAt: '' }
 const mockKey = { id: 'k1', label: 'production', lastUsedAt: null, createdAt: '2024-01-01T00:00:00Z' }
 
 describe('ApiKeyList', () => {

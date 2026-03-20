@@ -20,7 +20,7 @@ import * as svc from '../services/userService'
 import { prisma } from '../prisma'
 import router from '../routes/admin/users'
 
-const p = prisma.user as Record<string, ReturnType<typeof vi.fn>>
+const p = prisma.user as unknown as Record<string, ReturnType<typeof vi.fn>>
 const mockUser = { id: 'u1', name: 'Alice', sub: '123', provider: 'google', isGlobalAdmin: false }
 const globalAdmin = { ...mockUser, isGlobalAdmin: true }
 

@@ -8,7 +8,7 @@ vi.mock('../api/applications', () => ({
   deleteApplication: vi.fn(),
 }))
 
-import { getApplications, deleteApplication } from '../api/applications'
+import { getApplications } from '../api/applications'
 
 const mockApp = { id: 'app1', name: 'My App', customId: 'my-app', createdAt: '', updatedAt: '', _count: { roles: 2, userRoles: 5, apiKeys: 1 } }
 const bouncerApp = { id: 'bouncer', name: 'Bouncer', customId: 'bouncer', createdAt: '', updatedAt: '', _count: { roles: 1, userRoles: 1, apiKeys: 0 } }
