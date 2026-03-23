@@ -1,9 +1,6 @@
 import client from './client'
 import type { UserRole } from './users'
 
-export const getUserRoles = (userId: string) =>
-  client.get<UserRole[]>(`/users/${userId}/roles`).then(r => r.data)
-
 export const assignRole = (
   userId: string,
   appId: string,

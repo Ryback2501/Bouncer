@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import * as svc from "../../services/roleService";
 import { ensureBouncerDefaults } from "../../lib/bouncerDefaults";
+import { handlePrismaError } from "../../lib/prismaErrors";
 
 const router = Router({ mergeParams: true });
 
@@ -14,7 +15,7 @@ router.post("/", async (req: Request, res: Response) => {
   try {
     res.status(201).json(await svc.createRole(req.params.appId, { name, customId }));
   } catch (e) {
-    if ((e as { code?: string }).code ==="P2002") { res.status(409).json({ error: "customId already exists in this application" }); return; }
+    if (handlePrismaError(e, res)) return;
     throw e;
   }
 });
@@ -26,8 +27,8 @@ router.patch("/:roleId", async (req: Request, res: Response) => {
   try {
     res.json(await svc.updateRole(req.params.roleId, { name, customId }));
   } catch (e) {
-    if ((e as { code?: string }).code ==="P2025") { res.status(404).json({ error: "not_found" }); return; }
-    if ((e as { code?: string }).code ==="P2002") { res.status(409).json({ error: "customId already exists in this application" }); return; }
+    if (handlePrismaError(e, res)) return;
+    if (handlePrismaError(e, res)) return;
     throw e;
   }
 });
@@ -39,7 +40,7 @@ router.delete("/:roleId", async (req: Request, res: Response) => {
     await svc.deleteRole(req.params.roleId);
     res.status(204).send();
   } catch (e) {
-    if ((e as { code?: string }).code ==="P2025") { res.status(404).json({ error: "not_found" }); return; }
+    if (handlePrismaError(e, res)) return;
     throw e;
   }
 });

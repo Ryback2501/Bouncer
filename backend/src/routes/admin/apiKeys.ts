@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import * as svc from "../../services/apiKeyService";
+import { handlePrismaError } from "../../lib/prismaErrors";
 
 const router = Router({ mergeParams: true });
 
@@ -18,7 +19,7 @@ router.delete("/:keyId", async (req: Request, res: Response) => {
     await svc.deleteApiKey(req.params.keyId);
     res.status(204).send();
   } catch (e) {
-    if ((e as { code?: string }).code ==="P2025") { res.status(404).json({ error: "not_found" }); return; }
+    if (handlePrismaError(e, res)) return;
     throw e;
   }
 });

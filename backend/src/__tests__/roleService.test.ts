@@ -13,7 +13,7 @@ vi.mock('../prisma', () => ({
 }))
 
 import { prisma } from '../prisma'
-import { listRoles, getRole, createRole, updateRole, deleteRole } from '../services/roleService'
+import { listRoles, createRole, updateRole, deleteRole } from '../services/roleService'
 
 const p = prisma.role as unknown as Record<string, ReturnType<typeof vi.fn>>
 
@@ -31,20 +31,6 @@ describe('roleService', () => {
         orderBy: { createdAt: 'desc' },
         include: { _count: { select: { userRoles: true } } },
       })
-    })
-  })
-
-  describe('getRole', () => {
-    it('returns role by id', async () => {
-      const role = { id: 'r1', name: 'Admin' }
-      p.findUnique.mockResolvedValue(role)
-      expect(await getRole('r1')).toEqual(role)
-      expect(p.findUnique).toHaveBeenCalledWith({ where: { id: 'r1' } })
-    })
-
-    it('returns null when role not found', async () => {
-      p.findUnique.mockResolvedValue(null)
-      expect(await getRole('x')).toBeNull()
     })
   })
 

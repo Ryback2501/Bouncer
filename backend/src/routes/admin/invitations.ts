@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import * as svc from "../../services/invitationService";
+import { handlePrismaError } from "../../lib/prismaErrors";
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
     await svc.deleteInvitation(req.params.id);
     res.status(204).send();
   } catch (e) {
-    if ((e as { code?: string }).code ==="P2025") { res.status(404).json({ error: "not_found" }); return; }
+    if (handlePrismaError(e, res)) return;
     throw e;
   }
 });

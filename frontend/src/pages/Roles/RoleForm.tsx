@@ -35,7 +35,7 @@ export function RoleForm({ open, onClose, appId, existing }: Props) {
       onClose()
     },
     onError: (err: { response?: { data?: { error?: string } } }) => {
-      const msg = err.response?.data?.error?.includes('customId')
+      const msg = err.response?.data?.error === 'already_exists'
         ? 'That ID is already used in this application'
         : 'Something went wrong'
       toast.error(msg)

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
+import { useDeleteMutation } from '../../hooks/useDeleteMutation'
 import { ArrowLeft, Plus, Trash2, CheckCircle, XCircle } from 'lucide-react'
 import { getUser } from '../../api/users'
 import { removeRole } from '../../api/assignments'
@@ -8,7 +9,6 @@ import { Button } from '../../components/shared/Button'
 import { Badge } from '../../components/shared/Badge'
 import { ConfirmDialog } from '../../components/shared/ConfirmDialog'
 import { EmptyState } from '../../components/shared/EmptyState'
-import { useToast } from '../../components/shared/useToast'
 import { AssignRoleModal } from './AssignRoleModal'
 import type { UserRole } from '../../api/users'
 
@@ -23,8 +23,6 @@ function RoleStatus({ userRole }: { userRole: UserRole }) {
 
 export function UserDetail() {
   const { userId } = useParams<{ userId: string }>()
-  const qc = useQueryClient()
-  const toast = useToast()
   const [assignOpen, setAssignOpen] = useState(false)
   const [editingRole, setEditingRole] = useState<UserRole | null>(null)
   const [removingRole, setRemovingRole] = useState<UserRole | null>(null)
@@ -34,15 +32,12 @@ export function UserDetail() {
     queryFn: () => getUser(userId!),
   })
 
-  const removeMutation = useMutation({
-    mutationFn: (userRole: UserRole) => removeRole(userId!, userRole.applicationId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['user', userId] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-      toast.success('Role removed')
-      setRemovingRole(null)
-    },
-    onError: () => toast.error('Failed to remove role'),
+  const removeMutation = useDeleteMutation<UserRole>({
+    mutationFn: (userRole) => removeRole(userId!, userRole.applicationId),
+    queryKey: ['user', userId],
+    successMessage: 'Role removed',
+    errorMessage: 'Failed to remove role',
+    onSuccess: () => setRemovingRole(null),
   })
 
   if (isLoading) {

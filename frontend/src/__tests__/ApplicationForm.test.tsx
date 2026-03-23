@@ -52,7 +52,7 @@ describe('ApplicationForm', () => {
   })
 
   it('shows error toast when creation fails with duplicate customId', async () => {
-    vi.mocked(createApplication).mockRejectedValue({ response: { data: { error: 'customId already exists' } } })
+    vi.mocked(createApplication).mockRejectedValue({ response: { data: { error: 'already_exists' } } })
     renderWithProviders(<ApplicationForm open={true} onClose={vi.fn()} />)
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'App' } })
     fireEvent.change(screen.getByLabelText('ID'), { target: { value: 'app' } })

@@ -1,0 +1,161 @@
+openapi: 3.1.0
+info:
+  title: Bouncer External API
+  description: |
+    API for third-party applications to check whether a user has an active role
+    within the application associated with the provided API key.
+
+    ## Authentication
+    Every request must include a valid API key in the `Authorization` header:
+    ```
+    Authorization: Bearer bncr_<key>
+    ```
+    API keys are created via the Admin API and are scoped to a single application.
+
+    ## Usage flow
+    1. Create an application in Bouncer.
+    2. Generate an API key for that application.
+    3. Assign a role to a user in that application.
+    4. Call `GET /api/v1/access?sub=<user_sub>` with the API key to verify access.
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+components:
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      description: API key generated in the Admin UI (starts with "bncr_")
+
+  schemas:
+    AccessGranted:
+      type: object
+      properties:
+        sub:
+          type: string
+          description: Subject identifier of the user
+          example: "109876543210"
+        application:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            customId:
+              type: string
+              example: my-app
+            name:
+              type: string
+              example: My App
+        role:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            customId:
+              type: string
+              example: editor
+            name:
+              type: string
+              example: Editor
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+security:
+  - apiKey: []
+
+paths:
+  /api/v1/access:
+    get:
+      summary: Check user access
+      description: |
+        Checks whether the user identified by `sub` (and optionally `provider`) has
+        an active, non-expired role in the application associated with the API key.
+
+        Possible outcomes:
+        - **200** — user has an active role → returns role and application details.
+        - **400** — `sub` query parameter is missing.
+        - **401** — API key is missing or invalid.
+        - **403** — user has a role but it is inactive or expired.
+        - **404** — user not found, or user has no role in this application.
+      parameters:
+        - in: query
+          name: sub
+          required: true
+          schema:
+            type: string
+          description: Subject identifier of the user (from the OAuth provider)
+          example: "109876543210"
+        - in: query
+          name: provider
+          required: false
+          schema:
+            type: string
+          description: |
+            OAuth provider name (e.g. `google`, `microsoft`, `apple`).
+            Required only when the same `sub` exists across multiple providers.
+          example: google
+      responses:
+        '200':
+          description: User has an active role in this application
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessGranted'
+              example:
+                sub: "109876543210"
+                application:
+                  id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                  customId: my-app
+                  name: My App
+                role:
+                  id: "f0e1d2c3-b4a5-6789-abcd-ef0987654321"
+                  customId: editor
+                  name: Editor
+        '400':
+          description: Missing required `sub` parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: sub is required
+        '401':
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Unauthorized
+        '403':
+          description: User's role is inactive or expired
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      expiredAt:
+                        type: [string, 'null']
+                        format: date-time
+              example:
+                error: role_inactive
+                expiredAt: "2026-01-01T00:00:00.000Z"
+        '404':
+          description: User not found or has no role in this application
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: user_not_found

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Plus, Search, Pencil, Trash2, ChevronLeft, ChevronRight, Users } from 'lucide-react'
 import { getUsers, deleteUser, type User } from '../../api/users'
@@ -7,7 +7,8 @@ import { Button } from '../../components/shared/Button'
 import { ConfirmDialog } from '../../components/shared/ConfirmDialog'
 import { EmptyState } from '../../components/shared/EmptyState'
 import { Badge } from '../../components/shared/Badge'
-import { useToast } from '../../components/shared/useToast'
+import { SkeletonList } from '../../components/shared/SkeletonList'
+import { useDeleteMutation } from '../../hooks/useDeleteMutation'
 import { UserForm } from './UserForm'
 
 const providerColor: Record<string, 'blue' | 'green' | 'gray'> = {
@@ -17,8 +18,6 @@ const providerColor: Record<string, 'blue' | 'green' | 'gray'> = {
 }
 
 export function UserList() {
-  const qc = useQueryClient()
-  const toast = useToast()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [formOpen, setFormOpen] = useState(false)
@@ -31,15 +30,12 @@ export function UserList() {
     placeholderData: (prev) => prev,
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteUser(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['users'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-      toast.success('User deleted')
-      setDeleting(null)
-    },
-    onError: () => toast.error('Failed to delete user'),
+  const deleteMutation = useDeleteMutation<User>({
+    mutationFn: (user) => deleteUser(user.id),
+    queryKey: ['users'],
+    successMessage: 'User deleted',
+    errorMessage: 'Failed to delete user',
+    onSuccess: () => setDeleting(null),
   })
 
   const openCreate = () => { setEditing(null); setFormOpen(true) }
@@ -64,9 +60,7 @@ export function UserList() {
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">
-          {[...Array(5)].map((_, i) => <div key={i} className="h-16 rounded-xl bg-gray-200 animate-pulse" />)}
-        </div>
+        <SkeletonList count={5} />
       ) : !data || data.users.length === 0 ? (
         <EmptyState
           icon={Users}
@@ -141,7 +135,7 @@ export function UserList() {
       <ConfirmDialog
         open={!!deleting}
         onClose={() => setDeleting(null)}
-        onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
+        onConfirm={() => deleting && deleteMutation.mutate(deleting)}
         title="Delete User"
         message={`Are you sure you want to delete "${deleting?.name}"? All their role assignments will be removed.`}
         loading={deleteMutation.isPending}

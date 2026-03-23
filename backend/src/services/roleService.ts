@@ -8,10 +8,6 @@ export async function listRoles(applicationId: string) {
   });
 }
 
-export async function getRole(id: string) {
-  return prisma.role.findUnique({ where: { id } });
-}
-
 export async function createRole(applicationId: string, data: { name: string; customId: string }) {
   return prisma.role.create({ data: { ...data, applicationId } });
 }
