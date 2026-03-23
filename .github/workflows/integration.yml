@@ -1,0 +1,142 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [test]
+
+
+jobs:
+  backend-integration:
+    name: Backend integration tests (real DB)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bouncer
+          POSTGRES_PASSWORD: bouncer
+          POSTGRES_DB: bouncer_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://bouncer:bouncer@localhost:5432/bouncer_test
+      SESSION_SECRET: ci-session-secret-minimum-sixteen-chars
+      FRONTEND_URL: http://localhost:5173
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-node@v6.3.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Run database migrations
+        working-directory: backend
+        run: npx prisma migrate deploy
+
+      - name: Run integration tests
+        working-directory: backend
+        run: npm run test:integration
+
+
+  e2e:
+    name: E2E tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: backend-integration
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bouncer
+          POSTGRES_PASSWORD: bouncer
+          POSTGRES_DB: bouncer_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://bouncer:bouncer@localhost:5432/bouncer_test
+      SESSION_SECRET: ci-session-secret-minimum-sixteen-chars
+      FRONTEND_URL: http://localhost:5173
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-node@v6.3.0
+        with:
+          node-version: '24'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install e2e dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Run database migrations
+        working-directory: backend
+        run: npx prisma migrate deploy
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Start backend
+        working-directory: backend
+        run: npm run start &
+
+      - name: Start frontend dev server
+        working-directory: frontend
+        run: npm run dev &
+
+      - name: Wait for servers
+        run: npx wait-on http://localhost:3000/health http://localhost:5173 --timeout 30000
+
+      - name: Run E2E tests
+        working-directory: e2e
+        run: npm run test
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7

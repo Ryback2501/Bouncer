@@ -73,4 +73,21 @@ router.get("/logout", (req: Request, res: Response) => {
   });
 });
 
+// ── Test-only login (E2E) ──────────────────────────────────────────────────────
+// Only available in NODE_ENV=test. Creates a session for the first global admin,
+// allowing E2E tests to bypass OAuth.
+if (config.NODE_ENV === "test") {
+  router.post("/test-login", async (req: Request, res: Response) => {
+    const user = await prisma.user.findFirst({ where: { isGlobalAdmin: true } });
+    if (!user) {
+      res.status(404).json({ error: "no_admin_user" });
+      return;
+    }
+    req.login(user, (err) => {
+      if (err) { res.status(500).json({ error: "login_failed" }); return; }
+      res.json({ ok: true });
+    });
+  });
+}
+
 export default router;
