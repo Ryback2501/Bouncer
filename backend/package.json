@@ -11,7 +11,8 @@
     "db:studio": "prisma studio",
     "lint": "eslint .",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.mts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.5.0",
@@ -33,7 +34,8 @@
   },
   "overrides": {
     "hono": "^4.12.8",
-    "@hono/node-server": "^1.19.11"
+    "@hono/node-server": "^1.19.11",
+    "effect": "^3.20.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
@@ -41,12 +43,14 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/express-session": "^1.17.10",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.14.0",
     "@types/passport": "^1.0.16",
     "@types/passport-google-oauth20": "^2.0.14",
     "@types/supertest": "^6.0.0",
     "eslint": "^9.39.4",
     "globals": "^15.0.0",
+    "js-yaml": "^4.1.1",
     "prisma": "^7.5.0",
     "supertest": "^7.0.0",
     "tsx": "^4.15.7",

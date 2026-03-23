@@ -29,3 +29,8 @@ Thumbs.db
 
 # Apple private key
 *.p8
+
+# Playwright
+e2e/.auth/
+e2e/playwright-report/
+e2e/test-results/
