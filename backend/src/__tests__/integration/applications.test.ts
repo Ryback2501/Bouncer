@@ -3,7 +3,7 @@
  * Uses a real PostgreSQL database — no Prisma mocks.
  * Verifies full request → route → service → DB → response path.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import request from 'supertest'
 import { prisma } from '../../prisma'
 import { makeTestApp } from './testApp'
