@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useDeleteMutation } from '../../hooks/useDeleteMutation'
+import { SkeletonList } from '../../components/shared/SkeletonList'
 import { Plus, Trash2, UserCog, Users } from 'lucide-react'
 import {
   getAdmins, getInvitations, createInvitation, deleteInvitation,
@@ -44,14 +46,13 @@ export function AdminList() {
     onError: () => toast.error('Failed to create invitation'),
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: (inv: Invitation) => deleteInvitation(inv.id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['invitations'] })
-      toast.success('Invitation revoked')
-      setRevoking(null)
-    },
-    onError: () => toast.error('Failed to revoke invitation'),
+  const deleteMutation = useDeleteMutation<Invitation>({
+    mutationFn: (inv) => deleteInvitation(inv.id),
+    queryKey: ['invitations'],
+    successMessage: 'Invitation revoked',
+    errorMessage: 'Failed to revoke invitation',
+    invalidateDashboard: false,
+    onSuccess: () => setRevoking(null),
   })
 
   return (
@@ -65,9 +66,7 @@ export function AdminList() {
         </div>
 
         {adminsLoading ? (
-          <div className="space-y-3">
-            {[...Array(2)].map((_, i) => <div key={i} className="h-14 rounded-xl bg-gray-200 animate-pulse" />)}
-          </div>
+          <SkeletonList count={2} height="h-14" />
         ) : admins.length === 0 ? (
           <EmptyState icon={Users} title="No admins" description="The first person to sign in becomes the global admin." />
         ) : (
@@ -115,9 +114,7 @@ export function AdminList() {
         </div>
 
         {invitationsLoading ? (
-          <div className="space-y-3">
-            {[...Array(2)].map((_, i) => <div key={i} className="h-14 rounded-xl bg-gray-200 animate-pulse" />)}
-          </div>
+          <SkeletonList count={2} height="h-14" />
         ) : invitations.length === 0 ? (
           <EmptyState
             icon={UserCog}

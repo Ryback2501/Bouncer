@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useDeleteMutation } from '../../hooks/useDeleteMutation'
+import { SkeletonList } from '../../components/shared/SkeletonList'
 import { Plus, Trash2, Key, ArrowLeft } from 'lucide-react'
 import { getApiKeys, createApiKey, deleteApiKey, type NewApiKey } from '../../api/apiKeys'
 import { getApplication } from '../../api/applications'
@@ -16,7 +18,6 @@ import type { ApiKey } from '../../api/apiKeys'
 export function ApiKeyList() {
   const { appId } = useParams<{ appId: string }>()
   const qc = useQueryClient()
-  const toast = useToast()
   const [newKeyOpen, setNewKeyOpen] = useState(false)
   const [newLabel, setNewLabel] = useState('')
   const [generatedKey, setGeneratedKey] = useState<NewApiKey | null>(null)
@@ -36,14 +37,13 @@ export function ApiKeyList() {
     onError: () => toast.error('Failed to generate API key'),
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: (key: ApiKey) => deleteApiKey(appId!, key.id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['api-keys', appId] })
-      toast.success('API key revoked')
-      setDeleting(null)
-    },
-    onError: () => toast.error('Failed to revoke API key'),
+  const deleteMutation = useDeleteMutation<ApiKey>({
+    mutationFn: (key) => deleteApiKey(appId!, key.id),
+    queryKey: ['api-keys', appId],
+    successMessage: 'API key revoked',
+    errorMessage: 'Failed to revoke API key',
+    invalidateDashboard: false,
+    onSuccess: () => setDeleting(null),
   })
 
   return (
@@ -64,9 +64,7 @@ export function ApiKeyList() {
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">
-          {[...Array(2)].map((_, i) => <div key={i} className="h-16 rounded-xl bg-gray-200 animate-pulse" />)}
-        </div>
+        <SkeletonList count={2} />
       ) : keys.length === 0 ? (
         <EmptyState
           icon={Key}

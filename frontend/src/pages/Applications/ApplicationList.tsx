@@ -1,32 +1,28 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Plus, Pencil, Trash2, Key, Shield, AppWindow } from 'lucide-react'
 import { getApplications, deleteApplication, type Application } from '../../api/applications'
 import { Button } from '../../components/shared/Button'
 import { ConfirmDialog } from '../../components/shared/ConfirmDialog'
 import { EmptyState } from '../../components/shared/EmptyState'
-import { useToast } from '../../components/shared/useToast'
+import { SkeletonList } from '../../components/shared/SkeletonList'
+import { useDeleteMutation } from '../../hooks/useDeleteMutation'
 import { ApplicationForm } from './ApplicationForm'
 
 export function ApplicationList() {
-  const qc = useQueryClient()
-  const toast = useToast()
   const { data: apps = [], isLoading } = useQuery({ queryKey: ['applications'], queryFn: getApplications })
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Application | null>(null)
   const [deleting, setDeleting] = useState<Application | null>(null)
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteApplication(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['applications'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-      toast.success('Application deleted')
-      setDeleting(null)
-    },
-    onError: () => toast.error('Failed to delete application'),
+  const deleteMutation = useDeleteMutation<Application>({
+    mutationFn: (app) => deleteApplication(app.id),
+    queryKey: ['applications'],
+    successMessage: 'Application deleted',
+    errorMessage: 'Failed to delete application',
+    onSuccess: () => setDeleting(null),
   })
 
   const openCreate = () => { setEditing(null); setFormOpen(true) }
@@ -43,9 +39,7 @@ export function ApplicationList() {
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-20 rounded-xl bg-gray-200 animate-pulse" />)}
-        </div>
+        <SkeletonList count={3} height="h-20" />
       ) : apps.length === 0 ? (
         <EmptyState
           icon={AppWindow}
@@ -124,7 +118,7 @@ export function ApplicationList() {
       <ConfirmDialog
         open={!!deleting}
         onClose={() => setDeleting(null)}
-        onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
+        onConfirm={() => deleting && deleteMutation.mutate(deleting)}
         title="Delete Application"
         message={`Are you sure you want to delete "${deleting?.name}"? All roles and user assignments in this application will be permanently removed.`}
         loading={deleteMutation.isPending}

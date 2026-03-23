@@ -1,19 +1,18 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Plus, Pencil, Trash2, ArrowLeft, Shield } from 'lucide-react'
 import { getRoles, deleteRole, type Role } from '../../api/roles'
 import { getApplication } from '../../api/applications'
 import { Button } from '../../components/shared/Button'
 import { ConfirmDialog } from '../../components/shared/ConfirmDialog'
 import { EmptyState } from '../../components/shared/EmptyState'
-import { useToast } from '../../components/shared/useToast'
+import { SkeletonList } from '../../components/shared/SkeletonList'
+import { useDeleteMutation } from '../../hooks/useDeleteMutation'
 import { RoleForm } from './RoleForm'
 
 export function RoleList() {
   const { appId } = useParams<{ appId: string }>()
-  const qc = useQueryClient()
-  const toast = useToast()
 
   const { data: app } = useQuery({ queryKey: ['application', appId], queryFn: () => getApplication(appId!) })
   const { data: roles = [], isLoading } = useQuery({ queryKey: ['roles', appId], queryFn: () => getRoles(appId!) })
@@ -22,15 +21,12 @@ export function RoleList() {
   const [editing, setEditing] = useState<Role | null>(null)
   const [deleting, setDeleting] = useState<Role | null>(null)
 
-  const deleteMutation = useMutation({
-    mutationFn: (role: Role) => deleteRole(appId!, role.id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['roles', appId] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-      toast.success('Role deleted')
-      setDeleting(null)
-    },
-    onError: () => toast.error('Failed to delete role'),
+  const deleteMutation = useDeleteMutation<Role>({
+    mutationFn: (role) => deleteRole(appId!, role.id),
+    queryKey: ['roles', appId],
+    successMessage: 'Role deleted',
+    errorMessage: 'Failed to delete role',
+    onSuccess: () => setDeleting(null),
   })
 
   const openCreate = () => { setEditing(null); setFormOpen(true) }
@@ -54,9 +50,7 @@ export function RoleList() {
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-16 rounded-xl bg-gray-200 animate-pulse" />)}
-        </div>
+        <SkeletonList count={3} />
       ) : roles.length === 0 ? (
         <EmptyState
           icon={Shield}

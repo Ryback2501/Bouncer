@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import * as svc from "../../services/userService";
 import { prisma } from "../../prisma";
+import { handlePrismaError } from "../../lib/prismaErrors";
 
 const router = Router();
 
@@ -21,7 +22,7 @@ router.post("/", async (req: Request, res: Response) => {
   try {
     res.status(201).json(await svc.createUser({ name, sub, provider }));
   } catch (e) {
-    if ((e as { code?: string }).code ==="P2002") { res.status(409).json({ error: "A user with this sub+provider already exists" }); return; }
+    if (handlePrismaError(e, res)) return;
     throw e;
   }
 });
@@ -39,8 +40,8 @@ router.patch("/:userId", async (req: Request, res: Response) => {
   try {
     res.json(await svc.updateUser(req.params.userId, { name, sub, provider }));
   } catch (e) {
-    if ((e as { code?: string }).code ==="P2025") { res.status(404).json({ error: "not_found" }); return; }
-    if ((e as { code?: string }).code ==="P2002") { res.status(409).json({ error: "A user with this sub+provider already exists" }); return; }
+    if (handlePrismaError(e, res)) return;
+    if (handlePrismaError(e, res)) return;
     throw e;
   }
 });
@@ -52,7 +53,7 @@ router.delete("/:userId", async (req: Request, res: Response) => {
     await svc.deleteUser(req.params.userId);
     res.status(204).send();
   } catch (e) {
-    if ((e as { code?: string }).code ==="P2025") { res.status(404).json({ error: "not_found" }); return; }
+    if (handlePrismaError(e, res)) return;
     throw e;
   }
 });

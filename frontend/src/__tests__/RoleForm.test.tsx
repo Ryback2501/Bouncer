@@ -53,7 +53,7 @@ describe('RoleForm', () => {
   })
 
   it('shows error toast on duplicate customId', async () => {
-    vi.mocked(createRole).mockRejectedValue({ response: { data: { error: 'customId already exists in this application' } } })
+    vi.mocked(createRole).mockRejectedValue({ response: { data: { error: 'already_exists' } } })
     renderWithProviders(<RoleForm open={true} onClose={vi.fn()} appId="app1" />)
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Admin' } })
     fireEvent.change(screen.getByLabelText('ID'), { target: { value: 'admin' } })

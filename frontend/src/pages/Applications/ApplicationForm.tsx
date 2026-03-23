@@ -34,7 +34,7 @@ export function ApplicationForm({ open, onClose, existing }: Props) {
       onClose()
     },
     onError: (err: { response?: { data?: { error?: string } } }) => {
-      const msg = err.response?.data?.error === 'customId already exists'
+      const msg = err.response?.data?.error === 'already_exists'
         ? 'That ID is already taken'
         : 'Something went wrong'
       toast.error(msg)

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import * as svc from "../../services/assignmentService";
+import { handlePrismaError } from "../../lib/prismaErrors";
 
 const router = Router({ mergeParams: true });
 
@@ -19,7 +20,7 @@ router.put("/:appId", async (req: Request, res: Response) => {
       })
     );
   } catch (e) {
-    if ((e as { code?: string }).code ==="P2003") { res.status(400).json({ error: "invalid userId, applicationId or roleId" }); return; }
+    if (handlePrismaError(e, res)) return;
     throw e;
   }
 });
@@ -29,7 +30,7 @@ router.delete("/:appId", async (req: Request, res: Response) => {
     await svc.removeRole(req.params.userId, req.params.appId);
     res.status(204).send();
   } catch (e) {
-    if ((e as { code?: string }).code ==="P2025") { res.status(404).json({ error: "not_found" }); return; }
+    if (handlePrismaError(e, res)) return;
     throw e;
   }
 });

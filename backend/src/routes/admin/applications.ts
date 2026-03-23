@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import * as svc from "../../services/applicationService";
 import { ensureBouncerDefaults } from "../../lib/bouncerDefaults";
+import { handlePrismaError } from "../../lib/prismaErrors";
 
 const router = Router();
 
@@ -14,7 +15,7 @@ router.post("/", async (req: Request, res: Response) => {
   try {
     res.status(201).json(await svc.createApplication({ name, customId }));
   } catch (e) {
-    if ((e as { code?: string }).code === "P2002") { res.status(409).json({ error: "customId already exists" }); return; }
+    if (handlePrismaError(e, res)) return;
     throw e;
   }
 });
@@ -32,8 +33,7 @@ router.patch("/:appId", async (req: Request, res: Response) => {
   try {
     res.json(await svc.updateApplication(req.params.appId, { name, customId }));
   } catch (e) {
-    if ((e as { code?: string }).code ==="P2025") { res.status(404).json({ error: "not_found" }); return; }
-    if ((e as { code?: string }).code === "P2002") { res.status(409).json({ error: "customId already exists" }); return; }
+    if (handlePrismaError(e, res)) return;
     throw e;
   }
 });
@@ -45,7 +45,7 @@ router.delete("/:appId", async (req: Request, res: Response) => {
     await svc.deleteApplication(req.params.appId);
     res.status(204).send();
   } catch (e) {
-    if ((e as { code?: string }).code ==="P2025") { res.status(404).json({ error: "not_found" }); return; }
+    if (handlePrismaError(e, res)) return;
     throw e;
   }
 });
