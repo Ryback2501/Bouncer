@@ -6,8 +6,6 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1),
   SESSION_SECRET: z.string().min(16),
   FRONTEND_URL: z.string().url(),
-  ADMIN_ALLOWED_EMAILS: z.string().default(""),
-
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().optional(),
@@ -34,7 +32,3 @@ if (!parsed.success) {
 }
 
 export const config = parsed.data;
-
-export const adminAllowedEmails = config.ADMIN_ALLOWED_EMAILS
-  ? config.ADMIN_ALLOWED_EMAILS.split(",").map((e) => e.trim()).filter(Boolean)
-  : [];

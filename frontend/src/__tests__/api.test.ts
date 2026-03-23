@@ -16,7 +16,7 @@ import { getRoles, createRole, updateRole, deleteRole } from '../api/roles'
 import { getUsers, getUser, createUser, updateUser, deleteUser } from '../api/users'
 import { getApiKeys, createApiKey, deleteApiKey } from '../api/apiKeys'
 import { getInvitations, createInvitation, deleteInvitation, getAdmins } from '../api/invitations'
-import { getUserRoles, assignRole, removeRole } from '../api/assignments'
+import { assignRole, removeRole } from '../api/assignments'
 
 const c = client as unknown as { get: Mock; post: Mock; patch: Mock; put: Mock; delete: Mock }
 
@@ -176,12 +176,6 @@ describe('Invitations API', () => {
 
 describe('Assignments API', () => {
   beforeEach(() => vi.clearAllMocks())
-
-  it('getUserRoles calls GET /users/:userId/roles', async () => {
-    c.get.mockResolvedValue({ data: [] })
-    await getUserRoles('u1')
-    expect(c.get).toHaveBeenCalledWith('/users/u1/roles')
-  })
 
   it('assignRole calls PUT /users/:userId/roles/:appId', async () => {
     c.put.mockResolvedValue({ data: {} })
