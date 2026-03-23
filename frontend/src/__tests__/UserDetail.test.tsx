@@ -103,4 +103,24 @@ describe('UserDetail', () => {
     fireEvent.click(trashBtn)
     await waitFor(() => expect(screen.getByText('Remove Role')).toBeInTheDocument())
   })
+
+  it('shows Active badge for an active role with no expiry', async () => {
+    vi.mocked(getUser).mockResolvedValue(mockUser) // active: true, expiredAt: null
+    renderWithProviders(<UserDetail />, { route: '/users/u1', path: '/users/:userId' })
+    await waitFor(() => expect(screen.getByText('Active')).toBeInTheDocument())
+  })
+
+  it('shows Inactive badge when active is false', async () => {
+    const inactiveRole = { ...mockUserRole, active: false }
+    vi.mocked(getUser).mockResolvedValue({ ...mockUser, userRoles: [inactiveRole] })
+    renderWithProviders(<UserDetail />, { route: '/users/u1', path: '/users/:userId' })
+    await waitFor(() => expect(screen.getByText('Inactive')).toBeInTheDocument())
+  })
+
+  it('shows Inactive badge when role is expired (expiredAt in the past)', async () => {
+    const expiredRole = { ...mockUserRole, active: true, expiredAt: new Date(Date.now() - 86_400_000).toISOString() }
+    vi.mocked(getUser).mockResolvedValue({ ...mockUser, userRoles: [expiredRole] })
+    renderWithProviders(<UserDetail />, { route: '/users/u1', path: '/users/:userId' })
+    await waitFor(() => expect(screen.getByText('Inactive')).toBeInTheDocument())
+  })
 })

@@ -57,4 +57,19 @@ describe('UserList', () => {
     renderWithProviders(<UserList />)
     await waitFor(() => expect(screen.getByText('25 users total')).toBeInTheDocument())
   })
+
+  it('shows "No users found" when search returns empty results', async () => {
+    vi.mocked(getUsers).mockResolvedValue(pageResult([]))
+    renderWithProviders(<UserList />)
+    // Simulate a search
+    fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: 'xyz' } })
+    await waitFor(() => expect(screen.getByText('No users found')).toBeInTheDocument())
+  })
+
+  it('passes search term to getUsers', async () => {
+    vi.mocked(getUsers).mockResolvedValue(pageResult([mockUser]))
+    renderWithProviders(<UserList />)
+    fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: 'ali' } })
+    await waitFor(() => expect(getUsers).toHaveBeenCalledWith(expect.objectContaining({ search: 'ali' })))
+  })
 })
