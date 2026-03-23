@@ -18,6 +18,7 @@ import type { ApiKey } from '../../api/apiKeys'
 export function ApiKeyList() {
   const { appId } = useParams<{ appId: string }>()
   const qc = useQueryClient()
+  const toast = useToast()
   const [newKeyOpen, setNewKeyOpen] = useState(false)
   const [newLabel, setNewLabel] = useState('')
   const [generatedKey, setGeneratedKey] = useState<NewApiKey | null>(null)
