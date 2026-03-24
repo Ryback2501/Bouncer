@@ -1,0 +1,52 @@
+# Builds a production image from a published GitHub Release artifact.
+# Usage:
+#   docker build \
+#     --build-arg VERSION=0.2.0 \
+#     --build-arg GITHUB_REPO=your-org/bouncer \
+#     -f Dockerfile.release -t bouncer-backend:0.2.0 .
+#
+# For private repositories, pass a token with read:packages scope:
+#   --build-arg GITHUB_TOKEN=ghp_...
+
+ARG VERSION
+ARG GITHUB_REPO
+ARG GITHUB_TOKEN
+
+# ── Download & prepare ────────────────────────────────────────────────────────
+FROM node:24-alpine AS downloader
+
+ARG VERSION
+ARG GITHUB_REPO
+ARG GITHUB_TOKEN
+
+RUN apk add --no-cache curl unzip
+
+WORKDIR /app
+
+RUN HEADER="" && \
+    [ -n "$GITHUB_TOKEN" ] && HEADER="Authorization: Bearer ${GITHUB_TOKEN}" || true && \
+    curl -fsSL \
+      ${HEADER:+-H "$HEADER"} \
+      "https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}/bouncer-backend-v${VERSION}.zip" \
+      -o artifact.zip && \
+    unzip artifact.zip && \
+    rm artifact.zip
+
+RUN npm ci --omit=dev
+RUN npx prisma generate
+
+# ── Production image ──────────────────────────────────────────────────────────
+FROM node:24-alpine AS runner
+
+ENV NODE_ENV=production
+
+WORKDIR /app
+
+COPY --from=downloader /app/dist ./dist
+COPY --from=downloader /app/package.json ./
+COPY --from=downloader /app/node_modules ./node_modules
+COPY --from=downloader /app/prisma ./prisma
+
+EXPOSE 3000
+
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]

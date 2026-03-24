@@ -1,0 +1,41 @@
+# Builds a production image from a published GitHub Release artifact.
+# Usage:
+#   docker build \
+#     --build-arg VERSION=0.2.0 \
+#     --build-arg GITHUB_REPO=your-org/bouncer \
+#     -f Dockerfile.release -t bouncer-frontend:0.2.0 .
+#
+# For private repositories, pass a token with read:packages scope:
+#   --build-arg GITHUB_TOKEN=ghp_...
+
+ARG VERSION
+ARG GITHUB_REPO
+ARG GITHUB_TOKEN
+
+# ── Download ──────────────────────────────────────────────────────────────────
+FROM alpine AS downloader
+
+ARG VERSION
+ARG GITHUB_REPO
+ARG GITHUB_TOKEN
+
+RUN apk add --no-cache curl unzip
+
+WORKDIR /app
+
+RUN HEADER="" && \
+    [ -n "$GITHUB_TOKEN" ] && HEADER="Authorization: Bearer ${GITHUB_TOKEN}" || true && \
+    curl -fsSL \
+      ${HEADER:+-H "$HEADER"} \
+      "https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}/bouncer-frontend-v${VERSION}.zip" \
+      -o artifact.zip && \
+    unzip artifact.zip && \
+    rm artifact.zip
+
+# ── Production image ──────────────────────────────────────────────────────────
+FROM nginx:alpine AS runner
+
+COPY --from=downloader /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
