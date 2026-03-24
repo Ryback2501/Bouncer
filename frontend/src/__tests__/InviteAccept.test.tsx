@@ -46,7 +46,8 @@ describe('InviteAccept', () => {
     renderInviteAccept()
     await waitFor(() => expect(screen.getByText('Continue with Google')).toBeInTheDocument())
     expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
-    expect(screen.getByText('Continue with Apple')).toBeInTheDocument()
+    expect(screen.getByText('Continue with GitHub')).toBeInTheDocument()
+    expect(screen.getByText('Continue with LinkedIn')).toBeInTheDocument()
   })
 
   it('OAuth links include invite token in query string', async () => {

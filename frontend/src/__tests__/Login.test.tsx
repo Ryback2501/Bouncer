@@ -10,11 +10,12 @@ describe('Login page', () => {
     expect(screen.getByText('Bouncer')).toBeInTheDocument()
   })
 
-  it('renders all three OAuth provider buttons', () => {
+  it('renders all four OAuth provider buttons', () => {
     render(<Login />)
     expect(screen.getByText('Continue with Google')).toBeInTheDocument()
     expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
-    expect(screen.getByText('Continue with Apple')).toBeInTheDocument()
+    expect(screen.getByText('Continue with GitHub')).toBeInTheDocument()
+    expect(screen.getByText('Continue with LinkedIn')).toBeInTheDocument()
   })
 
   it('Google button links to /auth/google', () => {
