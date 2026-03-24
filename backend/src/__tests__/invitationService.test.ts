@@ -32,9 +32,9 @@ describe('invitationService', () => {
       }))
       const result = await createInvitation('u1')
 
-      // inviteUrl uses the locally-generated token passed to prisma.create
+      // inviteUrl contains the raw token (64 hex chars); the hash stored in DB is never exposed
       expect(result.inviteUrl).toMatch(/^http:\/\/localhost:5173\/invite\/[0-9a-f]{64}$/)
-      expect(result.inviteUrl).toBe(`http://localhost:5173/invite/${result.token}`)
+      expect(result).not.toHaveProperty('token')
       expect(p.create).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ createdById: 'u1' }),
         include: { createdBy: { select: { name: true, email: true } } },
@@ -53,7 +53,9 @@ describe('invitationService', () => {
       p.findMany.mockResolvedValue(invitations)
       const result = await listInvitations()
 
-      expect(result[0].inviteUrl).toBe('http://localhost:5173/invite/tok1')
+      // token hash is stripped; inviteUrl is no longer included in list (raw token not available)
+      expect(result[0]).not.toHaveProperty('token')
+      expect(result[0]).not.toHaveProperty('inviteUrl')
       expect(p.findMany).toHaveBeenCalledWith({
         orderBy: { createdAt: 'desc' },
         include: { createdBy: { select: { name: true, email: true } } },
