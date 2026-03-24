@@ -102,13 +102,16 @@ jobs:
         working-directory: e2e
         run: npm ci
 
-      - name: Install Playwright browsers
-        working-directory: e2e
-        run: npx playwright install --with-deps chromium
-
       - name: Generate Prisma client
         working-directory: backend
         run: npx prisma generate
+
+      - name: Copy Prisma client to e2e
+        run: cp -r backend/node_modules/.prisma e2e/node_modules/
+
+      - name: Install Playwright browsers
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
 
       - name: Run database migrations
         working-directory: backend

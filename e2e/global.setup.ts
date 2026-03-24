@@ -5,6 +5,7 @@
  */
 import { chromium } from '@playwright/test'
 import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
 import { mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 
@@ -13,16 +14,15 @@ const AUTH_DIR = '.auth'
 const AUTH_FILE = `${AUTH_DIR}/admin.json`
 
 async function globalSetup() {
-  const prisma = new PrismaClient({
-    datasources: { db: { url: process.env.DATABASE_URL } },
-  })
+  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
+  const prisma = new PrismaClient({ adapter })
 
   try {
     // Ensure the .auth directory exists
     if (!existsSync(AUTH_DIR)) await mkdir(AUTH_DIR, { recursive: true })
 
     // Seed: create or upsert a test admin user
-    await prisma.user.upsert({
+    const user = await prisma.user.upsert({
       where: { sub_provider: { sub: 'e2e-admin', provider: 'google' } },
       update: { isGlobalAdmin: true },
       create: {
@@ -32,6 +32,25 @@ async function globalSetup() {
         provider: 'google',
         isGlobalAdmin: true,
       },
+    })
+
+    // Ensure the bouncer app + admin role exist (mirrors ensureBouncerDefaults in the backend)
+    const bouncerApp = await prisma.application.upsert({
+      where: { customId: 'bouncer' },
+      update: {},
+      create: { name: 'Bouncer', customId: 'bouncer' },
+    })
+    const adminRole = await prisma.role.upsert({
+      where: { applicationId_customId: { applicationId: bouncerApp.id, customId: 'admin' } },
+      update: {},
+      create: { name: 'Admin', customId: 'admin', applicationId: bouncerApp.id },
+    })
+
+    // Assign the bouncer admin role to the e2e user (required by deserializeUser)
+    await prisma.userRole.upsert({
+      where: { userId_applicationId: { userId: user.id, applicationId: bouncerApp.id } },
+      update: { active: true, expiredAt: null, roleId: adminRole.id },
+      create: { userId: user.id, applicationId: bouncerApp.id, roleId: adminRole.id, active: true, expiredAt: null },
     })
 
     // Obtain an authenticated session via the test-login endpoint
