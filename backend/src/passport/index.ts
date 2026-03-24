@@ -2,7 +2,8 @@ import passport from "passport";
 import { prisma } from "../prisma";
 import { setupGoogleStrategy } from "./googleStrategy";
 import { setupMicrosoftStrategy } from "./microsoftStrategy";
-import { setupAppleStrategy } from "./appleStrategy";
+import { setupGitHubStrategy } from "./githubStrategy";
+import { setupLinkedInStrategy } from "./linkedinStrategy";
 import { ensureBouncerDefaults } from "../lib/bouncerDefaults";
 
 export async function configurePassport() {
@@ -10,7 +11,8 @@ export async function configurePassport() {
 
   setupGoogleStrategy();
   setupMicrosoftStrategy();
-  setupAppleStrategy();
+  setupGitHubStrategy();
+  setupLinkedInStrategy();
 
   passport.serializeUser((user: Express.User, done) => {
     done(null, user.id);

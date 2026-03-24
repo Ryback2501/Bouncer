@@ -15,11 +15,13 @@ const schema = z.object({
   MICROSOFT_TENANT_ID: z.string().default("common"),
   MICROSOFT_CALLBACK_URL: z.string().optional(),
 
-  APPLE_CLIENT_ID: z.string().optional(),
-  APPLE_TEAM_ID: z.string().optional(),
-  APPLE_KEY_ID: z.string().optional(),
-  APPLE_PRIVATE_KEY_PATH: z.string().optional(),
-  APPLE_CALLBACK_URL: z.string().optional(),
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  GITHUB_CALLBACK_URL: z.string().optional(),
+
+  LINKEDIN_CLIENT_ID: z.string().optional(),
+  LINKEDIN_CLIENT_SECRET: z.string().optional(),
+  LINKEDIN_CALLBACK_URL: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

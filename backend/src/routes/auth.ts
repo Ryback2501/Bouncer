@@ -40,12 +40,21 @@ router.get(
   (_req: Request, res: Response) => res.redirect(`${config.FRONTEND_URL}/`)
 );
 
-// ── Apple ─────────────────────────────────────────────────────────────────────
-router.get("/apple", requireProvider(config.APPLE_CLIENT_ID), storeInviteToken, passport.authenticate("apple"));
-router.post(
-  "/apple/callback",
-  requireProvider(config.APPLE_CLIENT_ID),
-  passport.authenticate("apple", { failureRedirect: `${config.FRONTEND_URL}/login?error=auth_failed` }),
+// ── GitHub ────────────────────────────────────────────────────────────────────
+router.get("/github", requireProvider(config.GITHUB_CLIENT_ID), storeInviteToken, passport.authenticate("github", { scope: ["user:email"] }));
+router.get(
+  "/github/callback",
+  requireProvider(config.GITHUB_CLIENT_ID),
+  passport.authenticate("github", { failureRedirect: `${config.FRONTEND_URL}/login?error=auth_failed` }),
+  (_req: Request, res: Response) => res.redirect(`${config.FRONTEND_URL}/`)
+);
+
+// ── LinkedIn ──────────────────────────────────────────────────────────────────
+router.get("/linkedin", requireProvider(config.LINKEDIN_CLIENT_ID), storeInviteToken, passport.authenticate("linkedin"));
+router.get(
+  "/linkedin/callback",
+  requireProvider(config.LINKEDIN_CLIENT_ID),
+  passport.authenticate("linkedin", { failureRedirect: `${config.FRONTEND_URL}/login?error=auth_failed` }),
   (_req: Request, res: Response) => res.redirect(`${config.FRONTEND_URL}/`)
 );
 

@@ -7,12 +7,13 @@ import { test, expect } from '@playwright/test'
  */
 
 test.describe('Login page', () => {
-  test('renders the Bouncer heading and three OAuth buttons', async ({ page }) => {
+  test('renders the Bouncer heading and four OAuth buttons', async ({ page }) => {
     await page.goto('/login')
     await expect(page.getByText('Bouncer')).toBeVisible()
     await expect(page.getByRole('link', { name: /Google/ })).toBeVisible()
     await expect(page.getByRole('link', { name: /Microsoft/ })).toBeVisible()
-    await expect(page.getByRole('link', { name: /Apple/ })).toBeVisible()
+    await expect(page.getByRole('link', { name: /GitHub/ })).toBeVisible()
+    await expect(page.getByRole('link', { name: /LinkedIn/ })).toBeVisible()
   })
 
   test('shows error message when ?error=auth_failed is in the URL', async ({ page }) => {
