@@ -18,7 +18,7 @@ import { makeTestApp } from './testApp'
 const app = makeTestApp()
 
 // Load and parse the OpenAPI specs from the api-specs directory
-const SPECS_DIR = resolve(__dirname, '../../../../../api-specs')
+const SPECS_DIR = resolve(__dirname, '../../../../api-specs')
 const adminSpec = yaml.load(readFileSync(resolve(SPECS_DIR, 'admin-api.yaml'), 'utf8')) as {
   components: { schemas: Record<string, { properties: Record<string, unknown> }> }
 }

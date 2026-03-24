@@ -3,7 +3,7 @@ info:
   title: Bouncer Admin API
   description: |
     REST API for managing applications, roles, users, API keys, and invitations.
-    All endpoints require authentication via OAuth session cookie (Google, Microsoft, or Apple).
+    All endpoints require authentication via OAuth session cookie (Google, Microsoft, GitHub, or LinkedIn).
   version: 0.1.0
 
 servers:
@@ -42,8 +42,6 @@ components:
           type: string
         customId:
           type: string
-        description:
-          type: [string, 'null']
         createdAt:
           type: string
           format: date-time
@@ -263,10 +261,10 @@ paths:
         '302':
           description: Redirect to frontend on success or /login on failure
 
-  /auth/apple:
+  /auth/github:
     get:
       tags: [auth]
-      summary: Initiate Apple OAuth login
+      summary: Initiate GitHub OAuth login
       security: []
       parameters:
         - in: query
@@ -276,12 +274,36 @@ paths:
           description: Optional invitation token
       responses:
         '302':
-          description: Redirect to Apple OAuth
+          description: Redirect to GitHub OAuth
 
-  /auth/apple/callback:
-    post:
+  /auth/github/callback:
+    get:
       tags: [auth]
-      summary: Apple OAuth callback
+      summary: GitHub OAuth callback
+      security: []
+      responses:
+        '302':
+          description: Redirect to frontend on success or /login on failure
+
+  /auth/linkedin:
+    get:
+      tags: [auth]
+      summary: Initiate LinkedIn OAuth login
+      security: []
+      parameters:
+        - in: query
+          name: invite
+          schema:
+            type: string
+          description: Optional invitation token
+      responses:
+        '302':
+          description: Redirect to LinkedIn OAuth
+
+  /auth/linkedin/callback:
+    get:
+      tags: [auth]
+      summary: LinkedIn OAuth callback
       security: []
       responses:
         '302':
