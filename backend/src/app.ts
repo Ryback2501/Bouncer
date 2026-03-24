@@ -5,8 +5,10 @@ import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import rateLimit from "express-rate-limit";
+import pinoHttp from "pino-http";
 import { Pool } from "pg";
 import { config } from "./config";
+import logger from "./lib/logger";
 import authRouter from "./routes/auth";
 import adminRouter from "./routes/admin";
 import accessRouter from "./routes/api/v1/access";
@@ -16,6 +18,9 @@ const PgSession = ConnectPgSimple(session);
 
 export function createApp() {
   const app = express();
+
+  // ── Request logging ───────────────────────────────────────────────────────
+  app.use(pinoHttp({ logger }));
 
   // ── Security ──────────────────────────────────────────────────────────────
   app.use(helmet({ contentSecurityPolicy: false }));
