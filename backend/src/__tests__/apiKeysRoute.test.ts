@@ -43,6 +43,18 @@ describe('POST /applications/:appId/api-keys', () => {
     expect(res.status).toBe(201)
     expect(res.body.rawKey).toBe('bncr_abc123')
   })
+
+  it('creates api key without label (label is optional)', async () => {
+    const newKey = { ...mockKey, rawKey: 'bncr_abc123', label: null }
+    vi.mocked(svc.createApiKey).mockResolvedValue(newKey as unknown as Awaited<ReturnType<typeof svc.createApiKey>>)
+    const res = await request(makeApp()).post('/app1/api-keys').send({})
+    expect(res.status).toBe(201)
+  })
+
+  it('returns 400 when label is an empty string', async () => {
+    const res = await request(makeApp()).post('/app1/api-keys').send({ label: '' })
+    expect(res.status).toBe(400)
+  })
 })
 
 describe('DELETE /applications/:appId/api-keys/:keyId', () => {

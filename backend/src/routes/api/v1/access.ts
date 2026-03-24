@@ -1,16 +1,18 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import { apiKeyAuth } from "../../../middleware/apiKeyAuth";
 import { prisma } from "../../../prisma";
+import { validateQuery } from "../../../middleware/validate";
 
 const router = Router();
 
-router.get("/access", apiKeyAuth, async (req: Request, res: Response) => {
-  const { sub, provider } = req.query as { sub?: string; provider?: string };
+const accessQuerySchema = z.object({
+  sub: z.string().min(1),
+  provider: z.string().optional(),
+});
 
-  if (!sub) {
-    res.status(400).json({ error: "sub query parameter is required" });
-    return;
-  }
+router.get("/access", apiKeyAuth, validateQuery(accessQuerySchema), async (req: Request, res: Response) => {
+  const { sub, provider } = req.query as z.infer<typeof accessQuerySchema>;
 
   const application = req.bouncerApp!;
 

@@ -1,15 +1,21 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import * as svc from "../../services/apiKeyService";
 import { handlePrismaError } from "../../lib/prismaErrors";
+import { validateBody } from "../../middleware/validate";
 
 const router = Router({ mergeParams: true });
+
+const createApiKeySchema = z.object({
+  label: z.string().min(1).optional(),
+});
 
 router.get("/", async (req: Request, res: Response) => {
   res.json(await svc.listApiKeys(req.params.appId));
 });
 
-router.post("/", async (req: Request, res: Response) => {
-  const { label } = req.body;
+router.post("/", validateBody(createApiKeySchema), async (req: Request, res: Response) => {
+  const { label } = req.body as z.infer<typeof createApiKeySchema>;
   const result = await svc.createApiKey(req.params.appId, label);
   res.status(201).json(result);
 });

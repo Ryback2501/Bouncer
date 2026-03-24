@@ -46,6 +46,21 @@ describe('GET /users', () => {
     await request(makeApp()).get('/?search=alice&page=2&limit=10')
     expect(svc.listUsers).toHaveBeenCalledWith({ search: 'alice', page: 2, limit: 10 })
   })
+
+  it('returns 400 when page is not a number', async () => {
+    const res = await request(makeApp()).get('/?page=abc')
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when limit exceeds maximum of 100', async () => {
+    const res = await request(makeApp()).get('/?limit=101')
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when page is zero or negative', async () => {
+    const res = await request(makeApp()).get('/?page=0')
+    expect(res.status).toBe(400)
+  })
 })
 
 describe('POST /users', () => {
@@ -60,6 +75,11 @@ describe('POST /users', () => {
 
   it('returns 400 when required fields are missing', async () => {
     const res = await request(makeApp()).post('/').send({ name: 'Alice' })
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when a required field is an empty string', async () => {
+    const res = await request(makeApp()).post('/').send({ name: '', sub: '123', provider: 'google' })
     expect(res.status).toBe(400)
   })
 
@@ -101,6 +121,11 @@ describe('PATCH /users/:userId', () => {
     const res = await request(makeApp()).patch('/u1').send({ name: 'Bob' })
     expect(res.status).toBe(200)
     expect(res.body.name).toBe('Bob')
+  })
+
+  it('returns 400 when a field is an empty string', async () => {
+    const res = await request(makeApp()).patch('/u1').send({ name: '' })
+    expect(res.status).toBe(400)
   })
 
   it('returns 404 when user not found', async () => {

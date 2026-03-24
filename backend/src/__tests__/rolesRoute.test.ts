@@ -64,6 +64,11 @@ describe('POST /applications/:appId/roles', () => {
     expect(res.status).toBe(400)
   })
 
+  it('returns 400 when a required field is an empty string', async () => {
+    const res = await request(makeApp()).post('/app1/roles').send({ name: '', customId: 'editor' })
+    expect(res.status).toBe(400)
+  })
+
   it('returns 409 on duplicate customId', async () => {
     vi.mocked(svc.createRole).mockRejectedValue({ code: 'P2002' })
     const res = await request(makeApp()).post('/app1/roles').send({ name: 'Editor', customId: 'editor' })
@@ -86,6 +91,12 @@ describe('PATCH /applications/:appId/roles/:roleId', () => {
     const res = await request(makeApp()).patch('/app1/roles/r1').send({ name: 'Updated' })
     expect(res.status).toBe(200)
     expect(res.body.name).toBe('Updated')
+  })
+
+  it('returns 400 when a field is an empty string', async () => {
+    mockDefaults()
+    const res = await request(makeApp()).patch('/app1/roles/r1').send({ name: '' })
+    expect(res.status).toBe(400)
   })
 
   it('returns 404 when role not found', async () => {
