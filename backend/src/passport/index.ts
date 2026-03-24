@@ -1,4 +1,5 @@
 import passport from "passport";
+import { createHash } from "crypto";
 import { prisma } from "../prisma";
 import { setupGoogleStrategy } from "./googleStrategy";
 import { setupMicrosoftStrategy } from "./microsoftStrategy";
@@ -86,8 +87,9 @@ export async function findOrCreateUser(
 
   // Case 4: validate invitation and create user + role atomically
   return prisma.$transaction(async (tx) => {
+    const tokenHash = createHash("sha256").update(inviteToken).digest("hex");
     const invitation = await tx.invitation.findFirst({
-      where: { token: inviteToken, usedAt: null, expiresAt: { gt: new Date() } },
+      where: { token: tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
     });
     if (!invitation) return null;
 

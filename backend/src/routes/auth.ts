@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import passport from "passport";
+import { createHash } from "crypto";
 import { config } from "../config";
 import { prisma } from "../prisma";
 
@@ -60,9 +61,10 @@ router.get(
 
 // ── Invitation preview (public) ───────────────────────────────────────────────
 router.get("/invite/:token", async (req: Request, res: Response) => {
+  const tokenHash = createHash("sha256").update(req.params.token).digest("hex");
   const invitation = await prisma.invitation.findFirst({
     where: {
-      token: req.params.token,
+      token: tokenHash,
       usedAt: null,
       expiresAt: { gt: new Date() },
     },
