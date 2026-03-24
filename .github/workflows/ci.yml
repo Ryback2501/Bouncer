@@ -6,6 +6,7 @@ on:
   push:
     branches: [dev, test, main]
 
+
 jobs:
   backend:
     name: Backend (typecheck, lint, test)
@@ -33,17 +34,21 @@ jobs:
       NODE_ENV: test
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6.3.0
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
         working-directory: backend
         run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
 
       - name: Type check
         working-directory: backend
@@ -53,10 +58,6 @@ jobs:
         working-directory: backend
         run: npm run lint
 
-      - name: Generate Prisma client
-        working-directory: backend
-        run: npx prisma generate
-
       - name: Run database migrations
         working-directory: backend
         run: npx prisma migrate deploy
@@ -65,16 +66,24 @@ jobs:
         working-directory: backend
         run: npm run test:run
 
+      - name: Build
+        working-directory: backend
+        run: npm run build
+
+      - name: Security audit
+        working-directory: backend
+        run: npm audit --audit-level=high
+
   frontend:
     name: Frontend (typecheck, lint, test)
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6.3.0
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
@@ -93,3 +102,11 @@ jobs:
       - name: Run tests
         working-directory: frontend
         run: npm run test:run
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Security audit
+        working-directory: frontend
+        run: npm audit --audit-level=high
