@@ -62,6 +62,11 @@ describe('POST /applications', () => {
     expect(res.status).toBe(400)
   })
 
+  it('returns 400 when a required field is an empty string', async () => {
+    const res = await request(makeApp()).post('/').send({ name: '', customId: 'my-app' })
+    expect(res.status).toBe(400)
+  })
+
   it('returns 409 when customId already exists', async () => {
     vi.mocked(svc.createApplication).mockRejectedValue({ code: 'P2002' })
     const res = await request(makeApp()).post('/').send({ name: 'My App', customId: 'my-app' })
@@ -101,6 +106,12 @@ describe('PATCH /applications/:appId', () => {
     const res = await request(makeApp()).patch('/app1').send({ name: 'Updated' })
     expect(res.status).toBe(200)
     expect(res.body.name).toBe('Updated')
+  })
+
+  it('returns 400 when a field is an empty string', async () => {
+    mockDefaults()
+    const res = await request(makeApp()).patch('/app1').send({ name: '' })
+    expect(res.status).toBe(400)
   })
 
   it('returns 404 when application not found', async () => {

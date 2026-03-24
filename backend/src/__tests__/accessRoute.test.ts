@@ -43,6 +43,11 @@ describe('GET /access', () => {
     expect(res.status).toBe(400)
   })
 
+  it('returns 400 when sub is an empty string', async () => {
+    const res = await request(makeApp()).get('/access?sub=')
+    expect(res.status).toBe(400)
+  })
+
   it('returns 404 when user not found', async () => {
     pu.findUnique.mockResolvedValue(null)
     const res = await request(makeApp()).get('/access?sub=123&provider=google')
