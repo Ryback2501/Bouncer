@@ -12,9 +12,10 @@ test.use({ storageState: path.join(__dirname, '../.auth/admin.json') })
 test.describe('Dashboard', () => {
   test('loads and shows stat cards', async ({ page }) => {
     await page.goto('/')
-    await expect(page.getByText('Applications')).toBeVisible()
-    await expect(page.getByText('Users')).toBeVisible()
-    await expect(page.getByText('Roles')).toBeVisible()
+    const main = page.locator('main')
+    await expect(main.getByText('Applications')).toBeVisible()
+    await expect(main.getByText('Users')).toBeVisible()
+    await expect(main.getByText('Roles')).toBeVisible()
   })
 })
 
