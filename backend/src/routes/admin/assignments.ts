@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as svc from "../../services/assignmentService";
 import { handlePrismaError } from "../../lib/prismaErrors";
 import { validateBody } from "../../middleware/validate";
+import { asyncHandler } from "../../lib/asyncHandler";
 
 const router = Router({ mergeParams: true });
 
@@ -12,11 +13,11 @@ const upsertAssignmentSchema = z.object({
   expiredAt: z.string().datetime().nullable().optional(),
 });
 
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", asyncHandler(async (req: Request, res: Response) => {
   res.json(await svc.getUserRoles(req.params.userId));
-});
+}));
 
-router.put("/:appId", validateBody(upsertAssignmentSchema), async (req: Request, res: Response) => {
+router.put("/:appId", validateBody(upsertAssignmentSchema), asyncHandler(async (req: Request, res: Response) => {
   const { roleId, active, expiredAt } = req.body as z.infer<typeof upsertAssignmentSchema>;
   try {
     res.json(
@@ -30,9 +31,9 @@ router.put("/:appId", validateBody(upsertAssignmentSchema), async (req: Request,
     if (handlePrismaError(e, res)) return;
     throw e;
   }
-});
+}));
 
-router.delete("/:appId", async (req: Request, res: Response) => {
+router.delete("/:appId", asyncHandler(async (req: Request, res: Response) => {
   try {
     await svc.removeRole(req.params.userId, req.params.appId);
     res.status(204).send();
@@ -40,6 +41,6 @@ router.delete("/:appId", async (req: Request, res: Response) => {
     if (handlePrismaError(e, res)) return;
     throw e;
   }
-});
+}));
 
 export default router;

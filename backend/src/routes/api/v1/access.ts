@@ -3,6 +3,7 @@ import { z } from "zod";
 import { apiKeyAuth } from "../../../middleware/apiKeyAuth";
 import { prisma } from "../../../prisma";
 import { validateQuery } from "../../../middleware/validate";
+import { asyncHandler } from "../../../lib/asyncHandler";
 
 const router = Router();
 
@@ -11,7 +12,7 @@ const accessQuerySchema = z.object({
   provider: z.string().optional(),
 });
 
-router.get("/access", apiKeyAuth, validateQuery(accessQuerySchema), async (req: Request, res: Response) => {
+router.get("/access", apiKeyAuth, validateQuery(accessQuerySchema), asyncHandler(async (req: Request, res: Response) => {
   const { sub, provider } = req.query as z.infer<typeof accessQuerySchema>;
 
   const application = req.bouncerApp!;
@@ -58,6 +59,6 @@ router.get("/access", apiKeyAuth, validateQuery(accessQuerySchema), async (req: 
       name: userRole.role.name,
     },
   });
-});
+}));
 
 export default router;

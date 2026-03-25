@@ -1,10 +1,11 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../../prisma";
 import { ensureBouncerDefaults } from "../../lib/bouncerDefaults";
+import { asyncHandler } from "../../lib/asyncHandler";
 
 const router = Router();
 
-router.get("/", async (_req: Request, res: Response) => {
+router.get("/", asyncHandler(async (_req: Request, res: Response) => {
   const { app, role } = await ensureBouncerDefaults();
   const userRoles = await prisma.userRole.findMany({
     where: { applicationId: app.id, roleId: role.id },
@@ -19,6 +20,6 @@ router.get("/", async (_req: Request, res: Response) => {
     isGlobalAdmin: ur.user.isGlobalAdmin,
     createdAt: ur.user.createdAt,
   })));
-});
+}));
 
 export default router;

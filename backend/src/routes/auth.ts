@@ -3,6 +3,7 @@ import passport from "passport";
 import { createHash } from "crypto";
 import { config } from "../config";
 import { prisma } from "../prisma";
+import { asyncHandler } from "../lib/asyncHandler";
 
 const router = Router();
 
@@ -60,7 +61,7 @@ router.get(
 );
 
 // ── Invitation preview (public) ───────────────────────────────────────────────
-router.get("/invite/:token", async (req: Request, res: Response) => {
+router.get("/invite/:token", asyncHandler(async (req: Request, res: Response) => {
   const tokenHash = createHash("sha256").update(req.params.token).digest("hex");
   const invitation = await prisma.invitation.findFirst({
     where: {
@@ -75,7 +76,7 @@ router.get("/invite/:token", async (req: Request, res: Response) => {
     return;
   }
   res.json({ valid: true, expiresAt: invitation.expiresAt });
-});
+}));
 
 // ── Logout ────────────────────────────────────────────────────────────────────
 router.get("/logout", (req: Request, res: Response) => {
@@ -88,7 +89,7 @@ router.get("/logout", (req: Request, res: Response) => {
 // Only available in NODE_ENV=test. Creates a session for the first global admin,
 // allowing E2E tests to bypass OAuth.
 if (config.NODE_ENV === "test") {
-  router.post("/test-login", async (req: Request, res: Response) => {
+  router.post("/test-login", asyncHandler(async (req: Request, res: Response) => {
     const user = await prisma.user.findFirst({ where: { isGlobalAdmin: true } });
     if (!user) {
       res.status(404).json({ error: "no_admin_user" });
@@ -98,7 +99,7 @@ if (config.NODE_ENV === "test") {
       if (err) { res.status(500).json({ error: "login_failed" }); return; }
       res.json({ ok: true });
     });
-  });
+  }));
 }
 
 export default router;

@@ -4,6 +4,7 @@ import * as svc from "../../services/applicationService";
 import { ensureBouncerDefaults } from "../../lib/bouncerDefaults";
 import { handlePrismaError } from "../../lib/prismaErrors";
 import { validateBody } from "../../middleware/validate";
+import { asyncHandler } from "../../lib/asyncHandler";
 
 const router = Router();
 
@@ -17,11 +18,11 @@ const updateApplicationSchema = z.object({
   customId: z.string().min(1).optional(),
 });
 
-router.get("/", async (_req: Request, res: Response) => {
+router.get("/", asyncHandler(async (_req: Request, res: Response) => {
   res.json(await svc.listApplications());
-});
+}));
 
-router.post("/", validateBody(createApplicationSchema), async (req: Request, res: Response) => {
+router.post("/", validateBody(createApplicationSchema), asyncHandler(async (req: Request, res: Response) => {
   const { name, customId } = req.body as z.infer<typeof createApplicationSchema>;
   try {
     res.status(201).json(await svc.createApplication({ name, customId }));
@@ -29,15 +30,15 @@ router.post("/", validateBody(createApplicationSchema), async (req: Request, res
     if (handlePrismaError(e, res)) return;
     throw e;
   }
-});
+}));
 
-router.get("/:appId", async (req: Request, res: Response) => {
+router.get("/:appId", asyncHandler(async (req: Request, res: Response) => {
   const app = await svc.getApplication(req.params.appId);
   if (!app) { res.status(404).json({ error: "not_found" }); return; }
   res.json(app);
-});
+}));
 
-router.patch("/:appId", validateBody(updateApplicationSchema), async (req: Request, res: Response) => {
+router.patch("/:appId", validateBody(updateApplicationSchema), asyncHandler(async (req: Request, res: Response) => {
   const { app } = await ensureBouncerDefaults();
   if (req.params.appId === app.id) { res.status(403).json({ error: "The Bouncer application cannot be modified" }); return; }
   const { name, customId } = req.body as z.infer<typeof updateApplicationSchema>;
@@ -47,9 +48,9 @@ router.patch("/:appId", validateBody(updateApplicationSchema), async (req: Reque
     if (handlePrismaError(e, res)) return;
     throw e;
   }
-});
+}));
 
-router.delete("/:appId", async (req: Request, res: Response) => {
+router.delete("/:appId", asyncHandler(async (req: Request, res: Response) => {
   const { app } = await ensureBouncerDefaults();
   if (req.params.appId === app.id) { res.status(403).json({ error: "The Bouncer application cannot be deleted" }); return; }
   try {
@@ -59,6 +60,6 @@ router.delete("/:appId", async (req: Request, res: Response) => {
     if (handlePrismaError(e, res)) return;
     throw e;
   }
-});
+}));
 
 export default router;

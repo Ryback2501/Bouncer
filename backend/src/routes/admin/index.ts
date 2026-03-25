@@ -8,6 +8,7 @@ import apiKeysRouter from "./apiKeys";
 import invitationsRouter from "./invitations";
 import adminsRouter from "./admins";
 import { prisma } from "../../prisma";
+import { asyncHandler } from "../../lib/asyncHandler";
 
 const router = Router();
 router.use(requireAdmin);
@@ -16,7 +17,7 @@ router.get("/me", (req: Request, res: Response) => {
   res.json(req.user);
 });
 
-router.get("/dashboard", async (_req: Request, res: Response) => {
+router.get("/dashboard", asyncHandler(async (_req: Request, res: Response) => {
   const [applications, users, roles, assignments] = await Promise.all([
     prisma.application.count(),
     prisma.user.count(),
@@ -24,7 +25,7 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
     prisma.userRole.count(),
   ]);
   res.json({ applications, users, roles, assignments });
-});
+}));
 
 router.use("/applications", applicationsRouter);
 router.use("/applications/:appId/roles", rolesRouter);
