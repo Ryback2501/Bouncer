@@ -6,6 +6,24 @@ const client = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+const MUTATING_METHODS = ['post', 'put', 'patch', 'delete']
+let csrfToken: string | null = null
+
+async function fetchCsrfToken(): Promise<string> {
+  if (!csrfToken) {
+    const res = await axios.get('/auth/csrf-token', { withCredentials: true })
+    csrfToken = res.data.csrfToken
+  }
+  return csrfToken!
+}
+
+client.interceptors.request.use(async (config) => {
+  if (MUTATING_METHODS.includes(config.method?.toLowerCase() ?? '')) {
+    config.headers['x-csrf-token'] = await fetchCsrfToken()
+  }
+  return config
+})
+
 const PUBLIC_PATHS = ['/login', '/invite']
 
 client.interceptors.response.use(

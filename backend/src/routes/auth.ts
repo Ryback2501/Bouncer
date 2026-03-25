@@ -4,6 +4,7 @@ import { createHash } from "crypto";
 import { config } from "../config";
 import { prisma } from "../prisma";
 import { asyncHandler } from "../lib/asyncHandler";
+import { generateCsrfToken } from "../middleware/csrf";
 
 const router = Router();
 
@@ -59,6 +60,11 @@ router.get(
   passport.authenticate("linkedin", { failureRedirect: `${config.FRONTEND_URL}/login?error=auth_failed` }),
   (_req: Request, res: Response) => res.redirect(`${config.FRONTEND_URL}/`)
 );
+
+// ── CSRF token (public) ───────────────────────────────────────────────────────
+router.get("/csrf-token", (req: Request, res: Response) => {
+  res.json({ csrfToken: generateCsrfToken(req, res) });
+});
 
 // ── Invitation preview (public) ───────────────────────────────────────────────
 router.get("/invite/:token", asyncHandler(async (req: Request, res: Response) => {

@@ -14,6 +14,7 @@ import adminRouter from "./routes/admin";
 import accessRouter from "./routes/api/v1/access";
 import { errorHandler } from "./middleware/errorHandler";
 import { prisma } from "./prisma";
+import { doubleCsrfProtection } from "./middleware/csrf";
 
 const PgSession = ConnectPgSimple(session);
 
@@ -68,7 +69,7 @@ export function createApp() {
 
   // ── Routes ────────────────────────────────────────────────────────────────
   app.use("/auth", authRouter);
-  app.use("/admin", adminRouter);
+  app.use("/admin", doubleCsrfProtection, adminRouter);
   app.use("/api/v1", accessRouter);
 
   // ── Health check ─────────────────────────────────────────────────────────
