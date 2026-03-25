@@ -13,6 +13,7 @@ import authRouter from "./routes/auth";
 import adminRouter from "./routes/admin";
 import accessRouter from "./routes/api/v1/access";
 import { errorHandler } from "./middleware/errorHandler";
+import { prisma } from "./prisma";
 
 const PgSession = ConnectPgSimple(session);
 
@@ -71,7 +72,14 @@ export function createApp() {
   app.use("/api/v1", accessRouter);
 
   // ── Health check ─────────────────────────────────────────────────────────
-  app.get("/health", (_req, res) => res.json({ status: "ok" }));
+  app.get("/health", async (_req, res) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      res.json({ status: "ok", db: "ok" });
+    } catch {
+      res.status(503).json({ status: "error", db: "unreachable" });
+    }
+  });
 
   // ── Error handler ─────────────────────────────────────────────────────────
   app.use(errorHandler);
