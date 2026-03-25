@@ -46,7 +46,12 @@ export function createApp() {
   app.use(express.urlencoded({ extended: true }));
 
   // ── Session ───────────────────────────────────────────────────────────────
-  const pool = new Pool({ connectionString: config.DATABASE_URL });
+  const pool = new Pool({
+    connectionString: config.DATABASE_URL,
+    max: 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+  });
   app.use(
     session({
       store: new PgSession({ pool, createTableIfMissing: true }),
