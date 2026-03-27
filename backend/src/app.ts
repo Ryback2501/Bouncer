@@ -41,6 +41,15 @@ export function createApp() {
     })
   );
 
+  // ── Auth-specific rate limiter (stricter) ─────────────────────────────────
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => config.NODE_ENV === "test",
+  });
+
   // ── Body parsing ──────────────────────────────────────────────────────────
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
@@ -73,7 +82,7 @@ export function createApp() {
   app.use(passport.session());
 
   // ── Routes ────────────────────────────────────────────────────────────────
-  app.use("/auth", authRouter);
+  app.use("/auth", authLimiter, authRouter);
   app.use("/admin", doubleCsrfProtection, adminRouter);
   app.use("/api/v1", accessRouter);
 
