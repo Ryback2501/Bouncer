@@ -1,12 +1,11 @@
 import { test, expect } from '@playwright/test'
-import * as path from 'path'
 
 /**
  * Role management E2E tests.
  * Uses the admin session from global.setup.ts.
  */
 
-test.use({ storageState: path.join(__dirname, '../.auth/admin.json') })
+test.use({ storageState: '.auth/admin.json' })
 
 test.describe('Roles', () => {
   test('creates a role and it appears in the list', async ({ page }) => {

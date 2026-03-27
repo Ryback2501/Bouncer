@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test'
-import * as path from 'path'
 
 /**
  * Authenticated admin UI tests.
@@ -7,7 +6,7 @@ import * as path from 'path'
  */
 
 // Reuse the session created in global setup
-test.use({ storageState: path.join(__dirname, '../.auth/admin.json') })
+test.use({ storageState: '.auth/admin.json' })
 
 test.describe('Dashboard', () => {
   test('loads and shows stat cards', async ({ page }) => {
