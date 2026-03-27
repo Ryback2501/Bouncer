@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
 import passport from "passport";
@@ -53,6 +54,7 @@ export function createApp() {
   // ── Body parsing ──────────────────────────────────────────────────────────
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  app.use(cookieParser());
 
   // ── Session ───────────────────────────────────────────────────────────────
   const pool = new Pool({
