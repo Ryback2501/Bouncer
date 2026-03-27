@@ -4,6 +4,7 @@ import * as svc from "../../services/roleService";
 import { ensureBouncerDefaults } from "../../lib/bouncerDefaults";
 import { handlePrismaError } from "../../lib/prismaErrors";
 import { validateBody } from "../../middleware/validate";
+import { asyncHandler } from "../../lib/asyncHandler";
 
 const router = Router({ mergeParams: true });
 
@@ -17,11 +18,11 @@ const updateRoleSchema = z.object({
   customId: z.string().min(1).optional(),
 });
 
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", asyncHandler(async (req: Request, res: Response) => {
   res.json(await svc.listRoles(req.params.appId));
-});
+}));
 
-router.post("/", validateBody(createRoleSchema), async (req: Request, res: Response) => {
+router.post("/", validateBody(createRoleSchema), asyncHandler(async (req: Request, res: Response) => {
   const { name, customId } = req.body as z.infer<typeof createRoleSchema>;
   try {
     res.status(201).json(await svc.createRole(req.params.appId, { name, customId }));
@@ -29,9 +30,9 @@ router.post("/", validateBody(createRoleSchema), async (req: Request, res: Respo
     if (handlePrismaError(e, res)) return;
     throw e;
   }
-});
+}));
 
-router.patch("/:roleId", validateBody(updateRoleSchema), async (req: Request, res: Response) => {
+router.patch("/:roleId", validateBody(updateRoleSchema), asyncHandler(async (req: Request, res: Response) => {
   const { role } = await ensureBouncerDefaults();
   if (req.params.roleId === role.id) { res.status(403).json({ error: "The Bouncer admin role cannot be modified" }); return; }
   const { name, customId } = req.body as z.infer<typeof updateRoleSchema>;
@@ -41,9 +42,9 @@ router.patch("/:roleId", validateBody(updateRoleSchema), async (req: Request, re
     if (handlePrismaError(e, res)) return;
     throw e;
   }
-});
+}));
 
-router.delete("/:roleId", async (req: Request, res: Response) => {
+router.delete("/:roleId", asyncHandler(async (req: Request, res: Response) => {
   const { role } = await ensureBouncerDefaults();
   if (req.params.roleId === role.id) { res.status(403).json({ error: "The Bouncer admin role cannot be deleted" }); return; }
   try {
@@ -53,6 +54,6 @@ router.delete("/:roleId", async (req: Request, res: Response) => {
     if (handlePrismaError(e, res)) return;
     throw e;
   }
-});
+}));
 
 export default router;

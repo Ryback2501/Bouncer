@@ -638,7 +638,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  data:
+                  users:
                     type: array
                     items:
                       $ref: '#/components/schemas/User'
@@ -893,7 +893,7 @@ paths:
                   - $ref: '#/components/schemas/ApiKey'
                   - type: object
                     properties:
-                      key:
+                      rawKey:
                         type: string
                         description: Raw API key (only shown once, starts with "bncr_")
         '401':

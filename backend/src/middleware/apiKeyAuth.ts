@@ -1,8 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import { createHash } from "crypto";
 import { prisma } from "../prisma";
+import logger from "../lib/logger";
+import { asyncHandler } from "../lib/asyncHandler";
 
-export async function apiKeyAuth(req: Request, res: Response, next: NextFunction) {
+export const apiKeyAuth = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) {
     res.status(401).json({ error: "invalid_api_key" });
@@ -26,8 +28,8 @@ export async function apiKeyAuth(req: Request, res: Response, next: NextFunction
   prisma.apiKey.update({
     where: { id: apiKey.id },
     data: { lastUsedAt: new Date() },
-  }).catch(() => {});
+  }).catch((err) => logger.error({ err }, "Failed to update API key lastUsedAt"));
 
   req.bouncerApp = apiKey.application;
   next();
-}
+});
