@@ -1,97 +1,124 @@
-name: Tag and release
+name: Release
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
 
+permissions:
+  contents: read
 
 jobs:
-  release:
-    name: Create tag and GitHub Release
+  read-version:
+    name: Read version
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.title, 'Release v')
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - id: version
+        run: |
+          VERSION=$(jq -r '.version' backend/package.json)
+          if ! printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "error: could not parse version from backend/package.json"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Releasing v$VERSION"
 
+  create-tag:
+    name: Create version tag
+    needs: [read-version]
+    runs-on: ubuntu-latest
     permissions:
       contents: write
-
-    env:
-      # Required for prisma generate and config.ts validation during build
-      DATABASE_URL: postgresql://build:build@localhost:5432/build
-      SESSION_SECRET: build-secret-placeholder-not-used-at-runtime
-      FRONTEND_URL: http://localhost:5173
-      NODE_ENV: production
-
     steps:
       - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
+      - name: Tag v$VERSION
+        env:
+          VERSION: ${{ needs.read-version.outputs.version }}
+        run: |
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists — skipping."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
 
+  create-artifacts:
+    name: Build & zip artifacts
+    needs: [read-version]
+    runs-on: ubuntu-latest
+    env:
+      # Required for prisma generate / config.ts validation during the build
+      DATABASE_URL: postgresql://build:build@localhost:5432/build
+      SESSION_SECRET: build-secret-placeholder-not-used-at-runtime
+      FRONTEND_URL: http://localhost:5173
+      NODE_ENV: production
+    steps:
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6.3.0
         with:
           node-version: '24'
 
-      - name: Read version from package.json
-        id: version
-        run: echo "version=$(jq -r '.version' backend/package.json)" >> $GITHUB_OUTPUT
-
-      # ── Backend ────────────────────────────────────────────────────────────
-
-      - name: Install backend dependencies
-        working-directory: backend
-        run: npm ci
-
-      - name: Generate Prisma client
-        working-directory: backend
-        run: npx prisma generate
-
       - name: Build backend
         working-directory: backend
-        run: npm run build
+        run: |
+          npm ci
+          npx prisma generate
+          npm run build
 
       - name: Package backend artifact
+        env:
+          VERSION: ${{ needs.read-version.outputs.version }}
         run: |
           mkdir -p artifacts
           cd backend
-          zip -r ../artifacts/bouncer-backend-v${{ steps.version.outputs.version }}.zip \
+          zip -r "../artifacts/bouncer-backend-v${VERSION}.zip" \
             dist/ \
             package.json \
             package-lock.json \
             prisma/schema.prisma \
             prisma/migrations/
 
-      # ── Frontend ───────────────────────────────────────────────────────────
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
       - name: Build frontend
         working-directory: frontend
-        run: npm run build
+        run: |
+          npm ci
+          npm run build
 
       - name: Package frontend artifact
+        env:
+          VERSION: ${{ needs.read-version.outputs.version }}
         run: |
           cd frontend
-          zip -r ../artifacts/bouncer-frontend-v${{ steps.version.outputs.version }}.zip dist/
+          zip -r "../artifacts/bouncer-frontend-v${VERSION}.zip" dist/
 
-      # ── Tag & Release ──────────────────────────────────────────────────────
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: artifacts/*.zip
+          retention-days: 7
 
-      - name: Create git tag
+  github-release:
+    name: GitHub Release
+    needs: [read-version, create-tag, create-artifacts]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: artifacts
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.read-version.outputs.version }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "v${{ steps.version.outputs.version }}"
-          git push origin "v${{ steps.version.outputs.version }}"
-
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          echo "$PR_BODY" > /tmp/release_notes.md
-          gh release create "v${{ steps.version.outputs.version }}" \
-            --title "v${{ steps.version.outputs.version }}" \
-            --notes-file /tmp/release_notes.md \
-            artifacts/bouncer-backend-v${{ steps.version.outputs.version }}.zip \
-            artifacts/bouncer-frontend-v${{ steps.version.outputs.version }}.zip
+          gh release create "v$VERSION" --generate-notes --title "v$VERSION" \
+            "artifacts/bouncer-backend-v${VERSION}.zip" \
+            "artifacts/bouncer-frontend-v${VERSION}.zip"
