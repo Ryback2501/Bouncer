@@ -1,4 +1,4 @@
-name: Promote test to main (release PR)
+name: Promote dev to main (release PR)
 
 on:
   workflow_dispatch:
@@ -22,11 +22,13 @@ jobs:
       pull-requests: write
 
     steps:
+      # GH_PAT (not GITHUB_TOKEN) so the version-bump push and the opened PR both
+      # trigger ci-jobs.yml — PRs created with GITHUB_TOKEN do not start workflows.
       - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
-          ref: test
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: dev
+          token: ${{ secrets.GH_PAT }}
 
       - name: Configure git
         run: |
@@ -48,26 +50,26 @@ jobs:
         run: |
           git add backend/package.json frontend/package.json
           git diff --staged --quiet || git commit -m "chore: bump version to ${{ inputs.version }}"
-          git push origin test
+          git push origin dev
 
       - name: Create release PR
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           RELEASE_NOTES: ${{ inputs.release_notes }}
         run: |
-          BODY="Release \`v${{ inputs.version }}\` — merging \`test\` into \`main\`."
+          BODY="Release \`v${{ inputs.version }}\` — merging \`dev\` into \`main\`."
           if [ -n "$RELEASE_NOTES" ]; then
             BODY="$BODY
 
           **Release notes:** $RELEASE_NOTES"
           fi
 
-          EXISTING=$(gh pr list --base main --head test --state open --json number --jq '.[0].number')
+          EXISTING=$(gh pr list --base main --head dev --state open --json number --jq '.[0].number')
           if [ -n "$EXISTING" ]; then
             echo "Release PR #$EXISTING already exists — skipping"
           else
             gh pr create \
-              --base main --head test \
+              --base main --head dev \
               --title "Release v${{ inputs.version }}" \
               --body "$BODY"
           fi
