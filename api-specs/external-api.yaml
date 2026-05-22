@@ -69,6 +69,31 @@ components:
         error:
           type: string
 
+    ValidationError:
+      type: object
+      description: Returned when query parameters fail validation (Zod).
+      properties:
+        error:
+          type: string
+          example: validation_error
+        issues:
+          type: array
+          description: One entry per failed validation rule.
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+                example: too_small
+              path:
+                type: array
+                items:
+                  type: string
+                example: [sub]
+              message:
+                type: string
+                example: "Too small: expected string to have >=1 characters"
+
 security:
   - apiKey: []
 
@@ -82,7 +107,7 @@ paths:
 
         Possible outcomes:
         - **200** — user has an active role → returns role and application details.
-        - **400** — `sub` query parameter is missing.
+        - **400** — query validation failed (e.g. `sub` missing or empty).
         - **401** — API key is missing or invalid.
         - **403** — user has a role but it is inactive or expired.
         - **404** — user not found, or user has no role in this application.
@@ -121,13 +146,17 @@ paths:
                   customId: editor
                   name: Editor
         '400':
-          description: Missing required `sub` parameter
+          description: Query parameters failed validation (e.g. `sub` missing or empty)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/ValidationError'
               example:
-                error: sub is required
+                error: validation_error
+                issues:
+                  - code: invalid_type
+                    path: [sub]
+                    message: "Invalid input: expected string, received undefined"
         '401':
           description: Missing or invalid API key
           content:
@@ -135,7 +164,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
-                error: Unauthorized
+                error: invalid_api_key
         '403':
           description: User's role is inactive or expired
           content:
