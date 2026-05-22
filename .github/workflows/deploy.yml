@@ -1,0 +1,27 @@
+name: Deploy (dev)
+
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to dev environment (gated)
+    runs-on: ubuntu-latest
+    if: vars.DEPLOY_ENABLED == 'true'
+    steps:
+      - run: 'echo "TODO: build/push images and deploy the dev environment"'
+
+  deploy-disabled:
+    name: Deploy to dev environment (gated — DISABLED)
+    runs-on: ubuntu-latest
+    if: vars.DEPLOY_ENABLED != 'true'
+    steps:
+      - run: echo "DEPLOY_ENABLED repo variable is not 'true' — dev deploy skipped (gated placeholder)."
