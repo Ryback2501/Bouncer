@@ -30,8 +30,7 @@ function storeInviteToken(req: Request, _res: Response, next: NextFunction) {
 //            app's redirect URL (or a confirmation page).
 // - "admin" (or undefined) → admin login / admin invite: keep the portal session, go to the portal.
 function finishAuth(req: Request, res: Response) {
-  const outcome = req.session.inviteOutcome;
-  delete req.session.inviteOutcome;
+  const outcome = req.inviteOutcome;
 
   if (outcome?.kind === "app") {
     const redirectTo =
@@ -114,10 +113,14 @@ router.get("/invite/:token", asyncHandler(async (req: Request, res: Response) =>
   });
 }));
 
-// ── Logout ────────────────────────────────────────────────────────────────────
-router.get("/logout", (req: Request, res: Response) => {
-  req.logout(() => {
-    res.redirect(`${config.FRONTEND_URL}/login`);
+// ── Logout (POST: sameSite=lax cookie makes cross-site POST CSRF-safe) ──────────
+router.post("/logout", (req: Request, res: Response) => {
+  req.logout((err) => {
+    if (err) { res.status(500).json({ error: "logout_failed" }); return; }
+    req.session.destroy(() => {
+      res.clearCookie("connect.sid");
+      res.status(204).send();
+    });
   });
 });
 

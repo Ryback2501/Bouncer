@@ -7,6 +7,7 @@ import ConnectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
+import { createHash } from "crypto";
 import { Pool } from "pg";
 import { config } from "./config";
 import logger from "./lib/logger";
@@ -23,11 +24,37 @@ const PgSession = ConnectPgSimple(session);
 export function createApp() {
   const app = express();
 
+  // ── Reverse proxy ───────────────────────────────────────────────────────────
+  // Required behind a TLS-terminating proxy so `secure` cookies are set and the real
+  // client IP is used for rate-limiting. TRUST_PROXY overrides; defaults on in production.
+  if (config.TRUST_PROXY !== undefined) {
+    const tp = config.TRUST_PROXY;
+    app.set(
+      "trust proxy",
+      tp === "true" ? true : tp === "false" ? false : /^\d+$/.test(tp) ? Number(tp) : tp
+    );
+  } else if (config.NODE_ENV === "production") {
+    app.set("trust proxy", 1);
+  }
+
   // ── Request logging ───────────────────────────────────────────────────────
   app.use(pinoHttp({ logger }));
 
   // ── Security ──────────────────────────────────────────────────────────────
-  app.use(helmet({ contentSecurityPolicy: false }));
+  // This service returns only JSON (no HTML/assets), so lock the CSP down hard and
+  // forbid framing. The admin SPA gets its own CSP from nginx.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: false,
+        directives: {
+          "default-src": ["'none'"],
+          "frame-ancestors": ["'none'"],
+          "base-uri": ["'none'"],
+        },
+      },
+    })
+  );
   app.use(
     cors({
       origin: config.FRONTEND_URL,
@@ -50,6 +77,25 @@ export function createApp() {
     standardHeaders: true,
     legacyHeaders: false,
     skip: () => config.NODE_ENV === "test",
+  });
+
+  // ── Per-API-key limiter for the external API (/api/v1/*) ──────────────────
+  // Buckets by the API key (hashed) so one key can't exhaust another's budget and a
+  // leaked key has a bounded blast radius. Falls back to client IP for keyless requests.
+  const apiKeyLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => config.NODE_ENV === "test",
+    validate: false,
+    keyGenerator: (req) => {
+      const auth = req.headers.authorization;
+      if (auth?.startsWith("Bearer ")) {
+        return "k:" + createHash("sha256").update(auth.slice(7)).digest("hex");
+      }
+      return "ip:" + (req.ip ?? "unknown");
+    },
   });
 
   // ── Body parsing ──────────────────────────────────────────────────────────
@@ -87,6 +133,7 @@ export function createApp() {
   // ── Routes ────────────────────────────────────────────────────────────────
   app.use("/auth", authLimiter, authRouter);
   app.use("/admin", doubleCsrfProtection, adminRouter);
+  app.use("/api/v1", apiKeyLimiter);
   app.use("/api/v1", accessRouter);
   app.use("/api/v1/invitations", apiInvitationsRouter);
 

@@ -26,6 +26,14 @@ export function Topbar({ onMenuClick, title }: TopbarProps) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  const handleLogout = async () => {
+    try {
+      await fetch('/auth/logout', { method: 'POST', credentials: 'include' })
+    } finally {
+      window.location.href = '/login'
+    }
+  }
+
   return (
     <header className="flex h-16 items-center gap-4 border-b border-gray-200 bg-white px-4 md:px-6">
       <button
@@ -56,13 +64,13 @@ export function Topbar({ onMenuClick, title }: TopbarProps) {
               <p className="text-xs text-gray-500 truncate">{admin?.email}</p>
               <p className="text-xs text-gray-400 mt-0.5">{providerLabel[admin?.provider ?? ''] ?? admin?.provider}</p>
             </div>
-            <a
-              href="/auth/logout"
-              className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+            <button
+              onClick={handleLogout}
+              className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
             >
               <LogOut size={14} />
               Sign out
-            </a>
+            </button>
           </div>
         )}
       </div>

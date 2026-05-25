@@ -109,4 +109,23 @@ describe('GET /api/v1/access — full flow integration', () => {
     expect(res.status).toBe(401)
     expect(res.body.error).toBe('invalid_api_key')
   })
+
+  it('returns 401 api_key_expired for an expired key', async () => {
+    const expiredRaw = `bncr_${randomBytes(32).toString('hex')}`
+    await prisma.apiKey.create({
+      data: {
+        applicationId: appId,
+        keyHash: createHash('sha256').update(expiredRaw).digest('hex'),
+        label: 'expired',
+        expiresAt: new Date(Date.now() - 1000),
+      },
+    })
+    const res = await request(app)
+      .get('/api/v1/access')
+      .query({ sub: `${PREFIX}-sub`, provider: 'google' })
+      .set('Authorization', `Bearer ${expiredRaw}`)
+
+    expect(res.status).toBe(401)
+    expect(res.body.error).toBe('api_key_expired')
+  })
 })

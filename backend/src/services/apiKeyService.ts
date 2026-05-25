@@ -5,16 +5,19 @@ export async function listApiKeys(applicationId: string) {
   return prisma.apiKey.findMany({
     where: { applicationId },
     orderBy: { createdAt: "desc" },
-    select: { id: true, label: true, lastUsedAt: true, createdAt: true },
+    select: { id: true, label: true, lastUsedAt: true, expiresAt: true, createdAt: true },
   });
 }
 
-export async function createApiKey(applicationId: string, label?: string) {
+export async function createApiKey(
+  applicationId: string,
+  opts?: { label?: string; expiresAt?: Date | null }
+) {
   const rawKey = `bncr_${randomBytes(32).toString("hex")}`;
   const keyHash = createHash("sha256").update(rawKey).digest("hex");
   const apiKey = await prisma.apiKey.create({
-    data: { applicationId, keyHash, label },
-    select: { id: true, label: true, createdAt: true },
+    data: { applicationId, keyHash, label: opts?.label, expiresAt: opts?.expiresAt ?? null },
+    select: { id: true, label: true, expiresAt: true, createdAt: true },
   });
   return { ...apiKey, rawKey };
 }

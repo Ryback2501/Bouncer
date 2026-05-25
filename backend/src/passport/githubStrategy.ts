@@ -27,7 +27,7 @@ export function setupGitHubStrategy() {
           );
           if (!result) return done(null, false);
           delete req.session.inviteToken;
-          req.session.inviteOutcome = result.outcome;
+          req.inviteOutcome = result.outcome;
           done(null, result.user);
         } catch (err) {
           done(err as Error);
