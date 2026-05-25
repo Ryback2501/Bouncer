@@ -23,4 +23,14 @@ describe('Authentication guards', () => {
     expect(res.status).toBe(401)
     expect(res.body.error).toBe('invalid_api_key')
   })
+
+  it('POST /auth/logout clears the session and returns 204', async () => {
+    const res = await request(app).post('/auth/logout')
+    expect(res.status).toBe(204)
+  })
+
+  it('GET /auth/logout is no longer allowed (logout is POST-only)', async () => {
+    const res = await request(app).get('/auth/logout')
+    expect(res.status).toBe(404)
+  })
 })

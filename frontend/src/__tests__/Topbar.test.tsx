@@ -37,7 +37,7 @@ describe('Topbar', () => {
     renderTopbar()
     fireEvent.click(screen.getByRole('button', { name: /Alice/ }))
     expect(screen.getByText('alice@test.com')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /sign out/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
   })
 
   it('hides dropdown when clicking outside', () => {

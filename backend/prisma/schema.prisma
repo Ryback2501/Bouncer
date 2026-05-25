@@ -84,6 +84,7 @@ model ApiKey {
   keyHash       String      @unique
   label         String?
   lastUsedAt    DateTime?
+  expiresAt     DateTime?
   createdAt     DateTime    @default(now())
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 }

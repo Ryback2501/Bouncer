@@ -55,6 +55,35 @@ describe('apiKeyAuth', () => {
     expect(next).not.toHaveBeenCalled()
   })
 
+  it('returns 401 api_key_expired when the key has expired', async () => {
+    const rawKey = 'bncr_expiredkey'
+    const keyHash = createHash('sha256').update(rawKey).digest('hex')
+    p.findUnique.mockResolvedValue({
+      id: 'k1', keyHash, expiresAt: new Date(Date.now() - 1000),
+      application: { id: 'app1', customId: 'my-app' },
+    })
+    const res = makeRes()
+    const next = vi.fn() as unknown as NextFunction
+    await apiKeyAuth(makeReq(`Bearer ${rawKey}`), res, next)
+    expect((res.status as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(401)
+    expect((res.json as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith({ error: 'api_key_expired' })
+    expect(next).not.toHaveBeenCalled()
+  })
+
+  it('allows a key whose expiresAt is in the future', async () => {
+    const rawKey = 'bncr_validkey'
+    const keyHash = createHash('sha256').update(rawKey).digest('hex')
+    const mockApp = { id: 'app1', customId: 'my-app' }
+    p.findUnique.mockResolvedValue({ id: 'k1', keyHash, expiresAt: new Date(Date.now() + 60_000), application: mockApp })
+    p.update.mockResolvedValue({})
+    const req = makeReq(`Bearer ${rawKey}`)
+    const res = makeRes()
+    const next = vi.fn() as unknown as NextFunction
+    await apiKeyAuth(req, res, next)
+    expect(req.bouncerApp).toEqual(mockApp)
+    expect(next).toHaveBeenCalledOnce()
+  })
+
   it('sets req.bouncerApp and calls next for a valid key', async () => {
     const rawKey = 'bncr_testkey'
     const keyHash = createHash('sha256').update(rawKey).digest('hex')

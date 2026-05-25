@@ -6,6 +6,7 @@ import { setupMicrosoftStrategy } from "./microsoftStrategy";
 import { setupGitHubStrategy } from "./githubStrategy";
 import { setupLinkedInStrategy } from "./linkedinStrategy";
 import { ensureBouncerDefaults } from "../lib/bouncerDefaults";
+import { config } from "../config";
 
 export async function configurePassport() {
   await ensureBouncerDefaults();
@@ -130,6 +131,12 @@ export async function findOrCreateUser(
     where: { applicationId: bouncerApp.id, roleId: adminRole.id },
   });
   if (adminCount === 0) {
+    // Bootstrap guard: only allowlisted emails may become the first global admin. This closes
+    // the "first person to reach OAuth wins global admin" race. (Required in production via config.)
+    const allowlist = config.ADMIN_ALLOWED_EMAILS;
+    if (allowlist.length > 0 && !allowlist.includes(profile.email.toLowerCase())) {
+      return null;
+    }
     const user = await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: {

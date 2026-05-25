@@ -9,6 +9,7 @@ const router = Router({ mergeParams: true });
 
 const createApiKeySchema = z.object({
   label: z.string().min(1).optional(),
+  expiresAt: z.string().datetime().nullable().optional(),
 });
 
 router.get("/", asyncHandler(async (req: Request, res: Response) => {
@@ -16,8 +17,11 @@ router.get("/", asyncHandler(async (req: Request, res: Response) => {
 }));
 
 router.post("/", validateBody(createApiKeySchema), asyncHandler(async (req: Request, res: Response) => {
-  const { label } = req.body as z.infer<typeof createApiKeySchema>;
-  const result = await svc.createApiKey(req.params.appId, label);
+  const { label, expiresAt } = req.body as z.infer<typeof createApiKeySchema>;
+  const result = await svc.createApiKey(req.params.appId, {
+    label,
+    expiresAt: expiresAt ? new Date(expiresAt) : null,
+  });
   res.status(201).json(result);
 }));
 

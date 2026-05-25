@@ -24,6 +24,11 @@ export const apiKeyAuth = asyncHandler(async (req: Request, res: Response, next:
     return;
   }
 
+  if (apiKey.expiresAt && apiKey.expiresAt < new Date()) {
+    res.status(401).json({ error: "api_key_expired" });
+    return;
+  }
+
   // Fire-and-forget: update lastUsedAt
   prisma.apiKey.update({
     where: { id: apiKey.id },

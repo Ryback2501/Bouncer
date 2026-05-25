@@ -30,7 +30,7 @@ export function setupLinkedInStrategy() {
           );
           if (!result) return done(null, false as unknown as Express.User);
           delete req.session.inviteToken;
-          req.session.inviteOutcome = result.outcome;
+          req.inviteOutcome = result.outcome;
           done(null, result.user);
         } catch (err) {
           done(err as Error);
