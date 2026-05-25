@@ -12,6 +12,7 @@ import { UserDetail } from './pages/Users/UserDetail'
 import { ApiKeyList } from './pages/ApiKeys/ApiKeyList'
 import { AdminList } from './pages/Admins/AdminList'
 import { InviteAccept } from './pages/InviteAccept'
+import { Invited } from './pages/Invited'
 
 function ProtectedRoutes() {
   const { admin, isLoading } = useAuth()
@@ -49,6 +50,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/invite/:token" element={<InviteAccept />} />
+            <Route path="/invited" element={<Invited />} />
             <Route path="/*" element={<ProtectedRoutes />} />
           </Routes>
         </AuthProvider>

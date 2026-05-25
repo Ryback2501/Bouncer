@@ -17,6 +17,12 @@ info:
     2. Generate an API key for that application.
     3. Assign a role to a user in that application.
     4. Call `GET /api/v1/access?sub=<user_sub>` with the API key to verify access.
+
+    ## Onboarding users via invitations
+    Instead of an admin creating each user by hand, your app can invite them:
+    1. `POST /api/v1/invitations` with the desired `role` to get a single-use `inviteUrl`.
+    2. Send the user the `inviteUrl`; they sign in with an OAuth provider.
+    3. Bouncer creates the user, assigns the role, and redirects them back to your app.
   version: 0.1.0
 
 servers:
@@ -93,6 +99,36 @@ components:
               message:
                 type: string
                 example: "Too small: expected string to have >=1 characters"
+
+    InvitationRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          description: customId of a role within the application this API key belongs to.
+          example: editor
+        redirectUri:
+          type: string
+          format: uri
+          description: >-
+            Where to send the user after they accept. Its origin must match one of the
+            application's registered redirect URIs. If omitted, Bouncer shows a confirmation page.
+          example: "https://app.example.com/welcome"
+
+    InvitationCreated:
+      type: object
+      properties:
+        inviteUrl:
+          type: string
+          format: uri
+          description: Single-use URL to deliver to the user; they accept by signing in with an OAuth provider.
+          example: "http://localhost:5173/invite/3f1a9c0b...e9"
+        expiresAt:
+          type: string
+          format: date-time
+          description: When the invitation expires (24h after creation).
+          example: "2026-05-26T09:24:16.000Z"
 
 security:
   - apiKey: []
@@ -188,3 +224,58 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: user_not_found
+
+  /api/v1/invitations:
+    post:
+      summary: Create a user invitation
+      description: |
+        Mint a single-use invitation for the application associated with the API key. Deliver the
+        returned `inviteUrl` to the user; when they accept it (signing in via an OAuth provider),
+        Bouncer creates the user and assigns the requested role in this application, then sends them
+        to `redirectUri` (or a confirmation page).
+
+        Outcomes:
+        - **201** — invitation created.
+        - **400** — body validation failed, or `redirectUri`'s origin is not in the application's allowlist.
+        - **401** — API key is missing or invalid.
+        - **404** — no role with that `customId` exists in this application.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationRequest'
+      responses:
+        '201':
+          description: Invitation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationCreated'
+              example:
+                inviteUrl: "http://localhost:5173/invite/3f1a9c0b...e9"
+                expiresAt: "2026-05-26T09:24:16.000Z"
+        '400':
+          description: Validation failed, or redirect URI origin not in the application allowlist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: redirect_uri_not_allowed
+        '401':
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: invalid_api_key
+        '404':
+          description: Role not found in this application
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: role_not_found

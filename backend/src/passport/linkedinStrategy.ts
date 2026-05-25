@@ -24,13 +24,14 @@ export function setupLinkedInStrategy() {
       async (req: Request, _issuer: string, profile: passport.Profile, done: VerifyCallback) => {
         try {
           const email = profile.emails?.[0]?.value ?? "";
-          const user = await findOrCreateUser(
+          const result = await findOrCreateUser(
             { sub: `linkedin:${profile.id}`, provider: "linkedin", name: profile.displayName ?? "", email },
             req.session.inviteToken
           );
-          if (user) delete req.session.inviteToken;
-          if (!user) return done(null, false as unknown as Express.User);
-          done(null, user);
+          if (!result) return done(null, false as unknown as Express.User);
+          delete req.session.inviteToken;
+          req.session.inviteOutcome = result.outcome;
+          done(null, result.user);
         } catch (err) {
           done(err as Error);
         }

@@ -7,6 +7,7 @@ import express from 'express'
 import type { User } from '@prisma/client'
 import adminRouter from '../../routes/admin'
 import accessRouter from '../../routes/api/v1/access'
+import apiInvitationsRouter from '../../routes/api/v1/invitations'
 
 export const testAdmin: Partial<User> = {
   id: 'test-admin-id',
@@ -31,6 +32,7 @@ export function makeTestApp() {
 
   app.use('/admin', adminRouter)
   app.use('/api/v1', accessRouter)
+  app.use('/api/v1/invitations', apiInvitationsRouter)
 
   return app
 }

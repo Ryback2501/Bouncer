@@ -13,6 +13,7 @@ import logger from "./lib/logger";
 import authRouter from "./routes/auth";
 import adminRouter from "./routes/admin";
 import accessRouter from "./routes/api/v1/access";
+import apiInvitationsRouter from "./routes/api/v1/invitations";
 import { errorHandler } from "./middleware/errorHandler";
 import { prisma } from "./prisma";
 import { doubleCsrfProtection } from "./middleware/csrf";
@@ -87,6 +88,7 @@ export function createApp() {
   app.use("/auth", authLimiter, authRouter);
   app.use("/admin", doubleCsrfProtection, adminRouter);
   app.use("/api/v1", accessRouter);
+  app.use("/api/v1/invitations", apiInvitationsRouter);
 
   // ── Health check ─────────────────────────────────────────────────────────
   app.get("/health", async (_req, res) => {

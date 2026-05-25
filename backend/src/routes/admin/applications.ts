@@ -11,11 +11,13 @@ const router = Router();
 const createApplicationSchema = z.object({
   name: z.string().min(1),
   customId: z.string().min(1),
+  redirectUris: z.array(z.string().url()).optional(),
 });
 
 const updateApplicationSchema = z.object({
   name: z.string().min(1).optional(),
   customId: z.string().min(1).optional(),
+  redirectUris: z.array(z.string().url()).optional(),
 });
 
 router.get("/", asyncHandler(async (_req: Request, res: Response) => {
@@ -23,9 +25,9 @@ router.get("/", asyncHandler(async (_req: Request, res: Response) => {
 }));
 
 router.post("/", validateBody(createApplicationSchema), asyncHandler(async (req: Request, res: Response) => {
-  const { name, customId } = req.body as z.infer<typeof createApplicationSchema>;
+  const { name, customId, redirectUris } = req.body as z.infer<typeof createApplicationSchema>;
   try {
-    res.status(201).json(await svc.createApplication({ name, customId }));
+    res.status(201).json(await svc.createApplication({ name, customId, redirectUris }));
   } catch (e) {
     if (handlePrismaError(e, res)) return;
     throw e;
@@ -41,9 +43,9 @@ router.get("/:appId", asyncHandler(async (req: Request, res: Response) => {
 router.patch("/:appId", validateBody(updateApplicationSchema), asyncHandler(async (req: Request, res: Response) => {
   const { app } = await ensureBouncerDefaults();
   if (req.params.appId === app.id) { res.status(403).json({ error: "The Bouncer application cannot be modified" }); return; }
-  const { name, customId } = req.body as z.infer<typeof updateApplicationSchema>;
+  const { name, customId, redirectUris } = req.body as z.infer<typeof updateApplicationSchema>;
   try {
-    res.json(await svc.updateApplication(req.params.appId, { name, customId }));
+    res.json(await svc.updateApplication(req.params.appId, { name, customId, redirectUris }));
   } catch (e) {
     if (handlePrismaError(e, res)) return;
     throw e;
