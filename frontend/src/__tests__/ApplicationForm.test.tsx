@@ -38,8 +38,40 @@ describe('ApplicationForm', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'New App' } })
     fireEvent.change(screen.getByLabelText('ID'), { target: { value: 'new-app' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create' }))
-    await waitFor(() => expect(createApplication).toHaveBeenCalledWith({ name: 'New App', customId: 'new-app' }))
+    await waitFor(() => expect(createApplication).toHaveBeenCalledWith({ name: 'New App', customId: 'new-app', redirectUris: [] }))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('parses the redirect-URIs textarea into an array (one per line, trimmed)', async () => {
+    vi.mocked(createApplication).mockResolvedValue(mockApp)
+    renderWithProviders(<ApplicationForm open={true} onClose={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'New App' } })
+    fireEvent.change(screen.getByLabelText('ID'), { target: { value: 'new-app' } })
+    fireEvent.change(screen.getByLabelText('Allowed redirect URIs'), {
+      target: { value: '  https://a.example/welcome \n\nhttps://b.example/cb\n' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(createApplication).toHaveBeenCalledWith({
+      name: 'New App', customId: 'new-app',
+      redirectUris: ['https://a.example/welcome', 'https://b.example/cb'],
+    }))
+  })
+
+  it('pre-fills redirect URIs (one per line) when editing', () => {
+    renderWithProviders(<ApplicationForm open={true} onClose={vi.fn()}
+      existing={{ ...mockApp, redirectUris: ['https://a.example/welcome', 'https://b.example/cb'] }} />)
+    expect((screen.getByLabelText('Allowed redirect URIs') as HTMLTextAreaElement).value)
+      .toBe('https://a.example/welcome\nhttps://b.example/cb')
+  })
+
+  it('blocks submit and shows an error when a redirect URI is not a valid URL', async () => {
+    renderWithProviders(<ApplicationForm open={true} onClose={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'New App' } })
+    fireEvent.change(screen.getByLabelText('ID'), { target: { value: 'new-app' } })
+    fireEvent.change(screen.getByLabelText('Allowed redirect URIs'), { target: { value: 'not a url' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(screen.getByText(/Not a valid URL/)).toBeInTheDocument())
+    expect(createApplication).not.toHaveBeenCalled()
   })
 
   it('calls updateApplication on submit when editing', async () => {
