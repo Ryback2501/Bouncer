@@ -10,7 +10,15 @@ info:
     ```
     Authorization: Bearer bncr_<key>
     ```
-    API keys are created via the Admin API and are scoped to a single application.
+    API keys are created in the Admin UI and are scoped to a single application. A key may have
+    an optional expiry; once past it, requests are rejected with `401 api_key_expired`.
+
+    ## Rate limiting
+    Requests to `/api/v1/*` are rate-limited **per API key** (a leaked or runaway key cannot
+    exhaust another application's budget): up to **300 requests per minute**. Every response
+    carries the standard `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers;
+    once the budget is exhausted the API responds `429 Too Many Requests` with a `Retry-After`
+    header indicating when to retry.
 
     ## Usage flow
     1. Create an application in Bouncer.
@@ -23,7 +31,7 @@ info:
     1. `POST /api/v1/invitations` with the desired `role` to get a single-use `inviteUrl`.
     2. Send the user the `inviteUrl`; they sign in with an OAuth provider.
     3. Bouncer creates the user, assigns the role, and redirects them back to your app.
-  version: 0.1.0
+  version: 0.2.0
 
 servers:
   - url: http://localhost:3000
@@ -35,6 +43,47 @@ components:
       type: http
       scheme: bearer
       description: API key generated in the Admin UI (starts with "bncr_")
+
+  headers:
+    RateLimit-Limit:
+      description: The per-API-key request ceiling for the current window (300/min).
+      schema:
+        type: integer
+        example: 300
+    RateLimit-Remaining:
+      description: Requests remaining in the current window before throttling.
+      schema:
+        type: integer
+        example: 297
+    RateLimit-Reset:
+      description: Seconds until the current rate-limit window resets.
+      schema:
+        type: integer
+        example: 42
+    Retry-After:
+      description: Seconds to wait before retrying (sent only on 429).
+      schema:
+        type: integer
+        example: 42
+
+  responses:
+    TooManyRequests:
+      description: Per-API-key rate limit exceeded (300 requests/minute)
+      headers:
+        RateLimit-Limit:
+          $ref: '#/components/headers/RateLimit-Limit'
+        RateLimit-Remaining:
+          $ref: '#/components/headers/RateLimit-Remaining'
+        RateLimit-Reset:
+          $ref: '#/components/headers/RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: too_many_requests
 
   schemas:
     AccessGranted:
@@ -113,7 +162,8 @@ components:
           format: uri
           description: >-
             Where to send the user after they accept. Its origin must match one of the
-            application's registered redirect URIs. If omitted, Bouncer shows a confirmation page.
+            application's registered redirect URIs (configured in the Bouncer admin UI). If
+            omitted, Bouncer shows a confirmation page.
           example: "https://app.example.com/welcome"
 
     InvitationCreated:
@@ -167,6 +217,13 @@ paths:
       responses:
         '200':
           description: User has an active role in this application
+          headers:
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -224,6 +281,8 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: user_not_found
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /api/v1/invitations:
     post:
@@ -248,6 +307,13 @@ paths:
       responses:
         '201':
           description: Invitation created
+          headers:
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -279,3 +345,5 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: role_not_found
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
