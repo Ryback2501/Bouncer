@@ -30,7 +30,11 @@ describe('fieldCrypto', () => {
 
   it('fails to decrypt tampered ciphertext (GCM auth)', () => {
     const enc = encryptField('secret@example.com')
-    const tampered = enc.slice(0, -3) + (enc.endsWith('A') ? 'B' : 'A') + enc.slice(-2)
+    // Tamper at the byte level (flip a byte inside the GCM tag) so the change is real regardless
+    // of base64 padding/redundancy, then re-encode.
+    const raw = Buffer.from(enc.slice('enc:v1:'.length), 'base64')
+    raw[20] ^= 0xff // index 20 is within the 16-byte auth tag (iv=0..11, tag=12..27)
+    const tampered = 'enc:v1:' + raw.toString('base64')
     expect(() => decryptField(tampered)).toThrow()
   })
 
