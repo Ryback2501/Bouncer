@@ -38,13 +38,77 @@ export async function configurePassport() {
   });
 }
 
+// How the OAuth callback should finish: "admin" keeps a Bouncer portal session (admin login or
+// admin invite); "app" means an external-app invite — log the user out and send them to the app.
+export interface AcceptOutcome {
+  kind: "admin" | "app";
+  redirectUri: string | null;
+  appCustomId: string;
+}
+
+export interface AcceptResult {
+  user: Express.User;
+  outcome: AcceptOutcome;
+}
+
 export async function findOrCreateUser(
   profile: { sub: string; provider: string; name: string; email: string },
   inviteToken?: string
-): Promise<Express.User | null> {
+): Promise<AcceptResult | null> {
   const { app: bouncerApp, role: adminRole } = await ensureBouncerDefaults();
 
-  // Case 1: user already exists — check they still have active Bouncer admin role
+  // ── Invitation path: accept an app-scoped (or admin) invite ─────────────────
+  // The invitation carries its target application + role. Create/update the user, assign the
+  // role (idempotent upsert), and consume the invite — all atomically.
+  if (inviteToken) {
+    return prisma.$transaction(async (tx) => {
+      const tokenHash = createHash("sha256").update(inviteToken).digest("hex");
+      const invitation = await tx.invitation.findFirst({
+        where: { token: tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
+        include: { application: { select: { customId: true } } },
+      });
+      if (!invitation) return null;
+
+      const user = await tx.user.upsert({
+        where: { sub_provider: { sub: profile.sub, provider: profile.provider } },
+        update: { name: profile.name, email: profile.email },
+        create: {
+          sub: profile.sub,
+          provider: profile.provider,
+          name: profile.name,
+          email: profile.email,
+          isGlobalAdmin: false,
+        },
+      });
+
+      // Same upsert as assignmentService.assignRole, but on the transaction client.
+      await tx.userRole.upsert({
+        where: { userId_applicationId: { userId: user.id, applicationId: invitation.applicationId } },
+        update: { roleId: invitation.roleId, active: true, expiredAt: null },
+        create: {
+          userId: user.id,
+          applicationId: invitation.applicationId,
+          roleId: invitation.roleId,
+          active: true,
+        },
+      });
+
+      await tx.invitation.update({ where: { id: invitation.id }, data: { usedAt: new Date() } });
+
+      const isAdminInvite =
+        invitation.applicationId === bouncerApp.id && invitation.roleId === adminRole.id;
+      return {
+        user,
+        outcome: {
+          kind: isAdminInvite ? "admin" : "app",
+          redirectUri: invitation.redirectUri,
+          appCustomId: invitation.application.customId,
+        },
+      };
+    });
+  }
+
+  // ── No invite: existing-admin login ─────────────────────────────────────────
   const existing = await prisma.user.findUnique({
     where: { sub_provider: { sub: profile.sub, provider: profile.provider } },
   });
@@ -54,19 +118,20 @@ export async function findOrCreateUser(
     });
     if (!userRole) return null;
     if (userRole.expiredAt && userRole.expiredAt < new Date()) return null;
-    return prisma.user.update({
+    const user = await prisma.user.update({
       where: { id: existing.id },
       data: { name: profile.name, email: profile.email },
     });
+    return { user, outcome: { kind: "admin", redirectUri: null, appCustomId: bouncerApp.customId } };
   }
 
-  // Case 2: no Bouncer admin UserRole exists at all — bootstrap first user as global admin
+  // ── No invite, no user: bootstrap the very first user as global admin ────────
   const adminCount = await prisma.userRole.count({
     where: { applicationId: bouncerApp.id, roleId: adminRole.id },
   });
   if (adminCount === 0) {
-    return prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
         data: {
           sub: profile.sub,
           provider: profile.provider,
@@ -76,39 +141,13 @@ export async function findOrCreateUser(
         },
       });
       await tx.userRole.create({
-        data: { userId: user.id, applicationId: bouncerApp.id, roleId: adminRole.id, active: true },
+        data: { userId: created.id, applicationId: bouncerApp.id, roleId: adminRole.id, active: true },
       });
-      return user;
+      return created;
     });
+    return { user, outcome: { kind: "admin", redirectUri: null, appCustomId: bouncerApp.customId } };
   }
 
-  // Case 3: admins exist, no invitation token — reject
-  if (!inviteToken) return null;
-
-  // Case 4: validate invitation and create user + role atomically
-  return prisma.$transaction(async (tx) => {
-    const tokenHash = createHash("sha256").update(inviteToken).digest("hex");
-    const invitation = await tx.invitation.findFirst({
-      where: { token: tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
-    });
-    if (!invitation) return null;
-
-    const user = await tx.user.create({
-      data: {
-        sub: profile.sub,
-        provider: profile.provider,
-        name: profile.name,
-        email: profile.email,
-        isGlobalAdmin: false,
-      },
-    });
-    await tx.userRole.create({
-      data: { userId: user.id, applicationId: bouncerApp.id, roleId: adminRole.id, active: true },
-    });
-    await tx.invitation.update({
-      where: { id: invitation.id },
-      data: { usedAt: new Date() },
-    });
-    return user;
-  });
+  // Admins exist, no invitation token — reject (non-invited, non-admin sign-in).
+  return null;
 }

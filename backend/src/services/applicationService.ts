@@ -14,11 +14,11 @@ export async function getApplication(id: string) {
   });
 }
 
-export async function createApplication(data: { name: string; customId: string }) {
+export async function createApplication(data: { name: string; customId: string; redirectUris?: string[] }) {
   return prisma.application.create({ data });
 }
 
-export async function updateApplication(id: string, data: { name?: string; customId?: string }) {
+export async function updateApplication(id: string, data: { name?: string; customId?: string; redirectUris?: string[] }) {
   return prisma.application.update({ where: { id }, data });
 }
 

@@ -7,14 +7,16 @@ datasource db {
 }
 
 model Application {
-  id        String     @id @default(uuid())
-  name      String
-  customId  String     @unique
-  roles     Role[]
-  apiKeys   ApiKey[]
-  userRoles UserRole[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id           String       @id @default(uuid())
+  name         String
+  customId     String       @unique
+  redirectUris String[]     @default([])
+  roles        Role[]
+  apiKeys      ApiKey[]
+  userRoles    UserRole[]
+  invitations  Invitation[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 }
 
 model Role {
@@ -22,10 +24,11 @@ model Role {
   name          String
   customId      String
   applicationId String
-  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  application   Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   userRoles     UserRole[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  invitations   Invitation[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   @@unique([applicationId, customId])
 }
@@ -61,13 +64,18 @@ model UserRole {
 }
 
 model Invitation {
-  id          String    @id @default(uuid())
-  token       String    @unique
-  createdById String
-  createdBy   User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  usedAt      DateTime?
-  expiresAt   DateTime
-  createdAt   DateTime  @default(now())
+  id            String      @id @default(uuid())
+  token         String      @unique
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  roleId        String
+  role          Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  redirectUri   String?
+  createdById   String?
+  createdBy     User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  usedAt        DateTime?
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
 }
 
 model ApiKey {

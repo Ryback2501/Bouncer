@@ -60,6 +60,16 @@ describe('InviteAccept', () => {
     expect(googleLink).toHaveAttribute('href', '/auth/google?invite=tok99')
   })
 
+  it('shows the application and role names when provided', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      json: async () => ({ valid: true, expiresAt: null, application: { name: 'My App' }, role: { name: 'Editor' } }),
+    } as Response)
+    renderInviteAccept()
+    await waitFor(() => screen.getByText('Continue with Google'))
+    expect(screen.getByText('My App')).toBeInTheDocument()
+    expect(screen.getByText('Editor')).toBeInTheDocument()
+  })
+
   it('shows expiry date when provided', async () => {
     const expiresAt = new Date(Date.now() + 3600_000).toISOString()
     vi.spyOn(global, 'fetch').mockResolvedValue({

@@ -53,14 +53,23 @@ export function InviteAccept() {
   const { token } = useParams<{ token: string }>()
   const [state, setState] = useState<State>('loading')
   const [expiresAt, setExpiresAt] = useState<string | null>(null)
+  const [appName, setAppName] = useState<string | null>(null)
+  const [roleName, setRoleName] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`/auth/invite/${token}`)
       .then(r => r.json())
-      .then((data: { valid: boolean; expiresAt: string | null }) => {
+      .then((data: {
+        valid: boolean
+        expiresAt: string | null
+        application?: { name: string }
+        role?: { name: string }
+      }) => {
         if (data.valid) {
           setState('valid')
           setExpiresAt(data.expiresAt)
+          setAppName(data.application?.name ?? null)
+          setRoleName(data.role?.name ?? null)
         } else {
           setState('invalid')
         }
@@ -100,6 +109,12 @@ export function InviteAccept() {
               <h2 className="text-center text-base font-semibold text-white mb-1">
                 Accept your invitation
               </h2>
+              {appName && (
+                <p className="text-center text-sm text-gray-300 mb-1">
+                  You've been invited to <span className="font-semibold text-white">{appName}</span>
+                  {roleName && <> as <span className="font-semibold text-white">{roleName}</span></>}
+                </p>
+              )}
               {expiresAt && (
                 <p className="text-center text-xs text-gray-400 mb-6">
                   Expires {new Date(expiresAt).toLocaleString()}

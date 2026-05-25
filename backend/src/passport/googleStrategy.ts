@@ -21,13 +21,14 @@ export function setupGoogleStrategy() {
       async (req: Request, _accessToken: string, _refreshToken: string, profile: Profile, done: VerifyDone) => {
         try {
           const email = profile.emails?.[0]?.value ?? "";
-          const user = await findOrCreateUser(
+          const result = await findOrCreateUser(
             { sub: `google:${profile.id}`, provider: "google", name: profile.displayName, email },
             req.session.inviteToken
           );
-          if (user) delete req.session.inviteToken;
-          if (!user) return done(null, false);
-          done(null, user);
+          if (!result) return done(null, false);
+          delete req.session.inviteToken;
+          req.session.inviteOutcome = result.outcome;
+          done(null, result.user);
         } catch (err) {
           done(err as Error);
         }

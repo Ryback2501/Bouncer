@@ -9,6 +9,13 @@ vi.mock('../services/invitationService', () => ({
   deleteInvitation: vi.fn(),
 }))
 
+vi.mock('../lib/bouncerDefaults', () => ({
+  ensureBouncerDefaults: vi.fn().mockResolvedValue({
+    app: { id: 'bouncer-app' },
+    role: { id: 'admin-role' },
+  }),
+}))
+
 import * as svc from '../services/invitationService'
 import router from '../routes/admin/invitations'
 
@@ -40,6 +47,8 @@ describe('GET /invitations', () => {
     const res = await request(makeApp()).get('/')
     expect(res.status).toBe(200)
     expect(res.body).toHaveLength(1)
+    // Admin list is scoped to the Bouncer app.
+    expect(svc.listInvitations).toHaveBeenCalledWith('bouncer-app')
   })
 })
 
@@ -51,7 +60,12 @@ describe('POST /invitations', () => {
     const res = await request(makeApp()).post('/')
     expect(res.status).toBe(201)
     expect(res.body.inviteUrl).toBe(mockInvitation.inviteUrl)
-    expect(svc.createInvitation).toHaveBeenCalledWith('u1')
+    // Admin invites are scoped to the Bouncer app + admin role, created by the admin user.
+    expect(svc.createInvitation).toHaveBeenCalledWith({
+      applicationId: 'bouncer-app',
+      roleId: 'admin-role',
+      createdById: 'u1',
+    })
   })
 })
 

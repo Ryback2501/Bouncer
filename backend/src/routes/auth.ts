@@ -25,13 +25,34 @@ function storeInviteToken(req: Request, _res: Response, next: NextFunction) {
   next();
 }
 
+// Final step of every OAuth callback. The verify step set req.session.inviteOutcome:
+// - "app"  → external-app invite: do NOT keep a portal session; log out and send the user to the
+//            app's redirect URL (or a confirmation page).
+// - "admin" (or undefined) → admin login / admin invite: keep the portal session, go to the portal.
+function finishAuth(req: Request, res: Response) {
+  const outcome = req.session.inviteOutcome;
+  delete req.session.inviteOutcome;
+
+  if (outcome?.kind === "app") {
+    const redirectTo =
+      outcome.redirectUri ?? `${config.FRONTEND_URL}/invited?app=${encodeURIComponent(outcome.appCustomId)}`;
+    req.logout((err) => {
+      if (err) { res.redirect(`${config.FRONTEND_URL}/login?error=logout_failed`); return; }
+      res.redirect(redirectTo);
+    });
+    return;
+  }
+
+  res.redirect(`${config.FRONTEND_URL}/`);
+}
+
 // ── Google ────────────────────────────────────────────────────────────────────
 router.get("/google", requireProvider(config.GOOGLE_CLIENT_ID), storeInviteToken, passport.authenticate("google", { scope: ["profile", "email"] }));
 router.get(
   "/google/callback",
   requireProvider(config.GOOGLE_CLIENT_ID),
   passport.authenticate("google", { failureRedirect: `${config.FRONTEND_URL}/login?error=auth_failed` }),
-  (_req: Request, res: Response) => res.redirect(`${config.FRONTEND_URL}/`)
+  finishAuth
 );
 
 // ── Microsoft ─────────────────────────────────────────────────────────────────
@@ -40,7 +61,7 @@ router.get(
   "/microsoft/callback",
   requireProvider(config.MICROSOFT_CLIENT_ID),
   passport.authenticate("microsoft", { failureRedirect: `${config.FRONTEND_URL}/login?error=auth_failed` }),
-  (_req: Request, res: Response) => res.redirect(`${config.FRONTEND_URL}/`)
+  finishAuth
 );
 
 // ── GitHub ────────────────────────────────────────────────────────────────────
@@ -49,7 +70,7 @@ router.get(
   "/github/callback",
   requireProvider(config.GITHUB_CLIENT_ID),
   passport.authenticate("github", { failureRedirect: `${config.FRONTEND_URL}/login?error=auth_failed` }),
-  (_req: Request, res: Response) => res.redirect(`${config.FRONTEND_URL}/`)
+  finishAuth
 );
 
 // ── LinkedIn ──────────────────────────────────────────────────────────────────
@@ -58,7 +79,7 @@ router.get(
   "/linkedin/callback",
   requireProvider(config.LINKEDIN_CLIENT_ID),
   passport.authenticate("linkedin", { failureRedirect: `${config.FRONTEND_URL}/login?error=auth_failed` }),
-  (_req: Request, res: Response) => res.redirect(`${config.FRONTEND_URL}/`)
+  finishAuth
 );
 
 // ── CSRF token (public) ───────────────────────────────────────────────────────
@@ -75,13 +96,22 @@ router.get("/invite/:token", asyncHandler(async (req: Request, res: Response) =>
       usedAt: null,
       expiresAt: { gt: new Date() },
     },
-    select: { expiresAt: true },
+    select: {
+      expiresAt: true,
+      application: { select: { name: true } },
+      role: { select: { name: true } },
+    },
   });
   if (!invitation) {
     res.json({ valid: false, expiresAt: null });
     return;
   }
-  res.json({ valid: true, expiresAt: invitation.expiresAt });
+  res.json({
+    valid: true,
+    expiresAt: invitation.expiresAt,
+    application: invitation.application,
+    role: invitation.role,
+  });
 }));
 
 // ── Logout ────────────────────────────────────────────────────────────────────
