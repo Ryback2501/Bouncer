@@ -23,6 +23,9 @@ const schema = z
     TRUST_PROXY: z.string().optional(),
     // Allowlist of emails permitted to bootstrap the first global admin. Required in production.
     ADMIN_ALLOWED_EMAILS: csvEmails,
+    // Base64-encoded 32-byte key for encrypting PII (email) at rest. Required in production.
+    // Generate: openssl rand -base64 32
+    ENCRYPTION_KEY: z.string().optional(),
 
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
@@ -43,7 +46,32 @@ const schema = z
   })
   // Production hardening: fail closed on weak/incomplete config.
   .superRefine((env, ctx) => {
+    // Validate the encryption key shape whenever it is provided (dev or prod).
+    if (env.ENCRYPTION_KEY !== undefined) {
+      let len = 0;
+      try {
+        len = Buffer.from(env.ENCRYPTION_KEY, "base64").length;
+      } catch {
+        len = 0;
+      }
+      if (len !== 32) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["ENCRYPTION_KEY"],
+          message: "must be a base64-encoded 32-byte key (generate: openssl rand -base64 32)",
+        });
+      }
+    }
+
     if (env.NODE_ENV !== "production") return;
+
+    if (!env.ENCRYPTION_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ENCRYPTION_KEY"],
+        message: "must be set in production to encrypt PII (email) at rest",
+      });
+    }
 
     if (env.SESSION_SECRET.length < 32) {
       ctx.addIssue({

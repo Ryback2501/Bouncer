@@ -22,6 +22,7 @@ built-in protections and what an operator must do to deploy it safely.
 | `SESSION_SECRET` | ≥ 32 chars. Generate: `openssl rand -base64 48`. |
 | `ADMIN_ALLOWED_EMAILS` | Non-empty. Comma-separated emails permitted to **bootstrap the first global admin** — closes the "first OAuth sign-in wins admin" race. |
 | One OAuth provider | At least one `*_CLIENT_ID` + `*_CLIENT_SECRET` pair. |
+| `ENCRYPTION_KEY` | Base64-encoded 32-byte key for encrypting PII at rest. Generate: `openssl rand -base64 32`. |
 | `DATABASE_URL` | Should include `sslmode=require` (warns if absent). |
 
 See `backend/.env.example` for the full list.
@@ -43,8 +44,10 @@ See `backend/.env.example` for the full list.
 - **Strong credentials:** never ship the dev `bouncer:bouncer` password; use a secrets manager.
 - **At rest:** run Postgres on an encrypted volume/disk; restrict network access to the app only.
 - **Already protected in-app:** API keys and invitation tokens are stored as SHA-256 hashes; Bouncer
-  stores **no** OAuth access/refresh tokens. PII (`email`) is plaintext today — application-layer
-  encryption of `email` is tracked separately.
+  stores **no** OAuth access/refresh tokens. PII (`email`) is **encrypted at rest** with AES-256-GCM
+  via a Prisma client extension (keyed by `ENCRYPTION_KEY`) — transparent on read/write. After
+  enabling it on an existing database, run the one-off backfill:
+  `cd backend && npx tsx scripts/encrypt-emails.ts` (idempotent).
 
 ## API keys
 
