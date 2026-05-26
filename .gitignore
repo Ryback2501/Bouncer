@@ -34,3 +34,7 @@ Thumbs.db
 e2e/.auth/
 e2e/playwright-report/
 e2e/test-results/
+
+# Docker-stack smoke validator
+.docker-validate-logs/
+backend/.env.docker
