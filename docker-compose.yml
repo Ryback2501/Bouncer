@@ -33,9 +33,9 @@ services:
         format: raw
     environment:
       # Container-correct overrides. Win over env_file: for keys present in both, so the
-      # user's host-side .env (DATABASE_URL=…@localhost, FRONTEND_URL=…:5173) stays usable
-      # for bash-scripts/runBouncer.sh while the dockerized stack gets compose-network
-      # hostnames and the host port the nginx container publishes.
+      # user's `backend/.env` can keep host-side values (e.g. DATABASE_URL=…@localhost) for
+      # ad-hoc `npm run dev`; the dockerized stack always gets compose-network hostnames
+      # and the host port the nginx container publishes.
       DATABASE_URL: postgresql://${POSTGRES_USER:-bouncer}:${POSTGRES_PASSWORD:-bouncer}@postgres:5432/${POSTGRES_DB:-bouncer}
       FRONTEND_URL: http://localhost
     depends_on:

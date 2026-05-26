@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Shared helpers for the docker-stack scripts (runBouncerDocker, stopBouncerDocker,
-# validateDockerStack). Sourced, not executed.
+# Shared helpers for the human-facing run/stop scripts (runBouncer, stopBouncer).
+# Sourced, not executed. CI and slash commands never touch this file — they inline
+# any logic they need so the bash-scripts directory is for humans only.
 
 # REPO_ROOT must be set by the caller before sourcing.
 : "${REPO_ROOT:?REPO_ROOT must be set before sourcing _dockerLib.sh}"
