@@ -1,27 +1,34 @@
 #!/usr/bin/env bash
-set -e
+# Build (incrementally) and start the full Bouncer stack on Docker: postgres + backend +
+# frontend, all wired through frontend/nginx.conf's reverse proxy.
+set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=./_dockerLib.sh
+source "$REPO_ROOT/bash-scripts/_dockerLib.sh"
 
-echo "Starting Bouncer backend..."
-cd "$REPO_ROOT/backend"
-npm run dev &
-BACKEND_PID=$!
+ensure_env_file
 
-echo "Starting Bouncer frontend..."
-cd "$REPO_ROOT/frontend"
-npm run dev &
-FRONTEND_PID=$!
+echo "--- docker compose up -d --build ---"
+compose up -d --build
 
-# Wait for the frontend dev server to be ready
-echo "Waiting for frontend to be ready..."
-until curl -s http://localhost:5173 > /dev/null 2>&1; do
-  sleep 1
-done
+echo "--- Waiting for backend /health and frontend / ---"
+if ! npx --yes wait-on \
+      http://localhost:3000/health \
+      http://localhost \
+      --timeout 60000; then
+  echo "Stack did not become healthy within 60s. Recent logs:" >&2
+  compose logs --no-color --tail=200 >&2 || true
+  exit 1
+fi
 
-echo "Opening browser..."
-xdg-open http://localhost:5173 2>/dev/null || open http://localhost:5173 2>/dev/null || true
-
-echo "Bouncer is running. Press Ctrl+C to stop."
-trap "kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit 0" INT TERM
-wait $BACKEND_PID $FRONTEND_PID
+echo ""
+echo "Bouncer is running:"
+echo "  Frontend (SPA + reverse proxy)  http://localhost"
+echo "  Backend API (direct, OAuth cb)  http://localhost:3000"
+echo "  Postgres                        localhost:5432"
+echo ""
+echo "Images in use:"
+compose images
+echo ""
+echo "Stop with: bash bash-scripts/stopBouncer.sh [--purge]"
