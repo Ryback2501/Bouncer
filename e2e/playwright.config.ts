@@ -10,7 +10,10 @@ export default defineConfig({
   timeout: 30_000,
 
   use: {
-    baseURL: 'http://localhost:5173',
+    // Single-origin: the backend serves both API and SPA. CI runs the same backend with
+    // STATIC_DIR pointing at frontend/dist; local e2e iteration should `npm run build` in
+    // frontend/ + `STATIC_DIR=../frontend/dist npm run start` in backend/ before tests.
+    baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },

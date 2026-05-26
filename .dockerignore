@@ -1,0 +1,33 @@
+# Root-level dockerignore for the single-image build (Dockerfile at repo root, build
+# context is the whole repo). Keeps node_modules, dist, env files, and dev-only trees out
+# of every COPY.
+
+**/node_modules
+**/dist
+**/build
+**/.env
+**/.env.*
+**/*.log
+
+.git
+.github
+.docker-validate-logs
+.claude
+.vscode
+.idea
+CLAUDE.md
+.mcp.json
+
+# Project trees that aren't part of the image
+e2e
+bash-scripts
+api-specs
+
+# Image artifacts / dev scaffolding
+docker-compose.yml
+backend/.env.docker
+backend/.env.example
+backend/Dockerfile
+backend/Dockerfile.release
+frontend/Dockerfile
+frontend/Dockerfile.release

@@ -8,6 +8,7 @@ import passport from "passport";
 import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
 import { createHash } from "crypto";
+import path from "path";
 import { Pool } from "pg";
 import { config } from "./config";
 import logger from "./lib/logger";
@@ -41,20 +42,32 @@ export function createApp() {
   app.use(pinoHttp({ logger }));
 
   // ── Security ──────────────────────────────────────────────────────────────
-  // This service returns only JSON (no HTML/assets), so lock the CSP down hard and
-  // forbid framing. The admin SPA gets its own CSP from nginx.
+  // CSP for the merged service that serves both the SPA (HTML/CSS/JS/fonts/images) and
+  // the API (JSON). Verbatim port of what frontend/nginx.conf used to set when the SPA
+  // was served by a separate nginx container. `style-src` allows `'unsafe-inline'` for
+  // Tailwind + inline component styles; everything else is locked to `'self'`.
   app.use(
     helmet({
       contentSecurityPolicy: {
         useDefaults: false,
         directives: {
-          "default-src": ["'none'"],
-          "frame-ancestors": ["'none'"],
-          "base-uri": ["'none'"],
+          defaultSrc:    ["'self'"],
+          scriptSrc:     ["'self'"],
+          styleSrc:      ["'self'", "'unsafe-inline'"],
+          imgSrc:        ["'self'", "data:"],
+          fontSrc:       ["'self'"],
+          connectSrc:    ["'self'"],
+          objectSrc:     ["'none'"],
+          baseUri:       ["'self'"],
+          formAction:    ["'self'"],
+          frameAncestors: ["'none'"],
         },
       },
+      referrerPolicy: { policy: "no-referrer" },
     })
   );
+  // Same-origin SPA → CORS is a no-op for SPA calls. Kept active for the dev-only Vite
+  // proxy case (FRONTEND_URL=http://localhost:5173) and as a defence-in-depth allowlist.
   app.use(
     cors({
       origin: config.FRONTEND_URL,
@@ -146,6 +159,32 @@ export function createApp() {
       res.status(503).json({ status: "error", db: "unreachable" });
     }
   });
+
+  // ── SPA static assets + client-side routing fallback ─────────────────────
+  // When STATIC_DIR is set (production image; or local dev that has run `npm run build`
+  // in frontend/), serve the built SPA from the same origin as the API. The hashed Vite
+  // assets get `immutable` long caching; `index.html` is no-cache so the next deploy
+  // lands on next visit. The fallback only fires for GETs that accept HTML so an API
+  // client that typo'd a route still gets a JSON 404 via errorHandler, not the SPA shell.
+  if (config.STATIC_DIR) {
+    app.use(
+      express.static(config.STATIC_DIR, {
+        index: false,
+        maxAge: "1y",
+        immutable: true,
+        setHeaders: (res, p) => {
+          if (p.endsWith("index.html")) {
+            res.setHeader("Cache-Control", "no-cache");
+          }
+        },
+      })
+    );
+    app.get(/.*/, (req, res, next) => {
+      if (!req.accepts("html")) return next();
+      res.setHeader("Cache-Control", "no-cache");
+      res.sendFile(path.join(config.STATIC_DIR!, "index.html"));
+    });
+  }
 
   // ── Error handler ─────────────────────────────────────────────────────────
   app.use(errorHandler);
