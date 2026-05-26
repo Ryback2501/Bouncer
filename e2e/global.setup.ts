@@ -9,7 +9,9 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 
-const BACKEND_URL = 'http://localhost:3000'
+// Single origin since the backend serves both API and SPA. Must match the baseURL in
+// playwright.config.ts.
+const APP_URL = 'http://localhost:3000'
 const AUTH_DIR = '.auth'
 const AUTH_FILE = `${AUTH_DIR}/admin.json`
 
@@ -55,11 +57,11 @@ async function globalSetup() {
 
     // Obtain an authenticated session via the test-login endpoint
     const browser = await chromium.launch()
-    const context = await browser.newContext({ baseURL: BACKEND_URL })
+    const context = await browser.newContext({ baseURL: APP_URL })
     const page = await context.newPage()
 
     // POST to the test-only login endpoint (only available when NODE_ENV=test)
-    const res = await page.request.post(`${BACKEND_URL}/auth/test-login`)
+    const res = await page.request.post(`${APP_URL}/auth/test-login`)
     if (!res.ok()) {
       throw new Error(`test-login failed: ${res.status()} ${await res.text()}`)
     }

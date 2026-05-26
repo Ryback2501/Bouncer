@@ -12,9 +12,9 @@ ensure_env_file
 echo "--- docker compose up -d --build ---"
 compose up -d --build
 
-echo "--- Waiting for backend /health and frontend / ---"
+echo "--- Waiting for /health and / ---"
 if ! npx --yes wait-on \
-      http://localhost:3000/health \
+      http://localhost/health \
       http://localhost \
       --timeout 60000; then
   echo "Stack did not become healthy within 60s. Recent logs:" >&2
@@ -24,9 +24,8 @@ fi
 
 echo ""
 echo "Bouncer is running:"
-echo "  Frontend (SPA + reverse proxy)  http://localhost"
-echo "  Backend API (direct, OAuth cb)  http://localhost:3000"
-echo "  Postgres                        localhost:5432"
+echo "  Bouncer (SPA + API)  http://localhost"
+echo "  Postgres             localhost:5432"
 echo ""
 echo "Images in use:"
 compose images

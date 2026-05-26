@@ -16,41 +16,34 @@ services:
       timeout: 5s
       retries: 5
 
-  backend:
+  bouncer:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "3000:3000"
-    # The bash wrappers (bash-scripts/_dockerLib.sh) materialize backend/.env into a
-    # `.env.docker` sibling with surrounding quotes stripped from each value, and we read
-    # that with `format: raw` so compose does NOT interpolate `$` characters inside
-    # values (random SESSION_SECRET / ENCRYPTION_KEY, some OAuth secrets contain literal
-    # `$`, which the default interpolation mode silently truncates).
+      # Publish on host :80 so the browser opens http://localhost. OAuth callback URLs
+      # registered in provider consoles must also point at this origin (e.g.
+      # http://localhost/auth/google/callback).
+      - "80:3000"
+    # bash-scripts/_dockerLib.sh materializes backend/.env into a `.env.docker` sibling
+    # with surrounding quotes stripped from each value, and we read that with
+    # `format: raw` so compose does NOT interpolate `$` characters inside values (random
+    # SESSION_SECRET / ENCRYPTION_KEY and some OAuth secrets contain literal `$`, which
+    # the default interpolation mode silently truncates).
     env_file:
       - path: ./backend/.env.docker
         format: raw
     environment:
-      # Container-correct overrides. Win over env_file: for keys present in both, so the
-      # user's `backend/.env` can keep host-side values (e.g. DATABASE_URL=…@localhost) for
+      # Container-correct overrides — win over env_file: for keys present in both. The
+      # user's backend/.env can keep host-side values (e.g. DATABASE_URL=…@localhost) for
       # ad-hoc `npm run dev`; the dockerized stack always gets compose-network hostnames
-      # and the host port the nginx container publishes.
+      # and the host-published origin.
       DATABASE_URL: postgresql://${POSTGRES_USER:-bouncer}:${POSTGRES_PASSWORD:-bouncer}@postgres:5432/${POSTGRES_DB:-bouncer}
       FRONTEND_URL: http://localhost
     depends_on:
       postgres:
         condition: service_healthy
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
 
 volumes:
   postgres_data:

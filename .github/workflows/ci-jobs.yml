@@ -184,8 +184,11 @@ jobs:
     env:
       DATABASE_URL: postgresql://bouncer:bouncer@localhost:5432/bouncer_test
       SESSION_SECRET: ci-session-secret-minimum-sixteen-chars
-      FRONTEND_URL: http://localhost:5173
+      FRONTEND_URL: http://localhost:3000
       NODE_ENV: test
+      # Backend serves the built SPA from this path. The same single-origin setup that
+      # ships in the production Docker image — keeps e2e exercising what users hit.
+      STATIC_DIR: ${{ github.workspace }}/frontend/dist
 
     steps:
       - uses: actions/checkout@v6.0.2
@@ -225,16 +228,16 @@ jobs:
         working-directory: backend
         run: npm run build
 
-      - name: Start backend
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Start backend (serves API + built SPA)
         working-directory: backend
         run: npm run start &
 
-      - name: Start frontend dev server
-        working-directory: frontend
-        run: npm run dev &
-
-      - name: Wait for servers
-        run: npx wait-on http://localhost:3000/health http://localhost:5173 --timeout 30000
+      - name: Wait for server
+        run: npx wait-on http://localhost:3000/health http://localhost:3000 --timeout 30000
 
       - name: Run E2E tests
         working-directory: e2e
@@ -285,13 +288,13 @@ jobs:
         run: docker compose up -d
 
       - name: Wait for /health and /
-        run: npx --yes wait-on http://localhost:3000/health http://localhost --timeout 60000
+        run: npx --yes wait-on http://localhost/health http://localhost --timeout 60000
 
       - name: Smoke assertions
         run: |
           set -euo pipefail
-          curl -fsS http://localhost:3000/health | grep -q '"status":"ok"'
-          curl -fsS http://localhost:3000/health | grep -q '"db":"ok"'
+          curl -fsS http://localhost/health | grep -q '"status":"ok"'
+          curl -fsS http://localhost/health | grep -q '"db":"ok"'
           curl -fsS http://localhost/ | grep -q '<div id="root"'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/admin/applications)" = "401"
 

@@ -26,6 +26,11 @@ const schema = z
     // Base64-encoded 32-byte key for encrypting PII (email) at rest. Required in production.
     // Generate: openssl rand -base64 32
     ENCRYPTION_KEY: z.string().optional(),
+    // Filesystem path of the built SPA's `dist/` directory. When set, Express serves it as
+    // static assets plus an HTML-accepting GET fallback to index.html (SPA client-side
+    // routing). The production Docker image sets this to /app/public; leave unset to keep
+    // a backend-only process (the integration test app does this).
+    STATIC_DIR: z.string().optional(),
 
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
