@@ -2,36 +2,44 @@ openapi: 3.1.0
 info:
   title: Bouncer External API
   description: |
-    API for third-party applications to check whether a user has an active role
-    within the application associated with the provided API key.
+    Server-to-server API for applications integrated with Bouncer. It lets your backend:
+
+    - check whether a given user has an active role in your application
+      (`GET /api/v1/access`), and
+    - onboard new users by minting single-use invitations that Bouncer accepts through
+      its own OAuth flow (`POST /api/v1/invitations`).
 
     ## Authentication
     Every request must include a valid API key in the `Authorization` header:
     ```
     Authorization: Bearer bncr_<key>
     ```
-    API keys are created in the Admin UI and are scoped to a single application. A key may have
-    an optional expiry; once past it, requests are rejected with `401 api_key_expired`.
-
-    ## Rate limiting
-    Requests to `/api/v1/*` are rate-limited **per API key** (a leaked or runaway key cannot
-    exhaust another application's budget): up to **300 requests per minute**. Every response
-    carries the standard `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers;
-    once the budget is exhausted the API responds `429 Too Many Requests` with a `Retry-After`
-    header indicating when to retry.
+    API keys are created in the Bouncer admin UI and are scoped to a single application.
+    A key may have an optional expiry; once past it, requests are rejected with
+    `401 api_key_expired`.
 
     ## Usage flow
-    1. Create an application in Bouncer.
-    2. Generate an API key for that application.
-    3. Assign a role to a user in that application.
-    4. Call `GET /api/v1/access?sub=<user_sub>` with the API key to verify access.
+    1. A Bouncer admin registers your application (custom ID, allowed redirect URIs, roles)
+       and issues an API key.
+    2. When you want to grant access to a new end-user, mint an invitation via
+       `POST /api/v1/invitations` with the role's `customId` (and optionally a `redirectUri`).
+       Bouncer returns a single-use `inviteUrl`.
+    3. Deliver `inviteUrl` to the user — email, in-app message, whatever your product uses.
+       Bouncer does not send it for you.
+    4. The user opens `inviteUrl`, lands on a Bouncer-hosted page, and signs in with an OAuth
+       provider. Bouncer creates (or finds) the user, assigns the requested role within your
+       application, marks the invitation used, and redirects the browser to `redirectUri`
+       (or to a Bouncer-hosted confirmation page if `redirectUri` was omitted).
+    5. From your backend, verify access on subsequent visits with
+       `GET /api/v1/access?sub=<sub>`. Pass `provider` too if the same `sub` could collide
+       across OAuth providers.
 
-    ## Onboarding users via invitations
-    Instead of an admin creating each user by hand, your app can invite them:
-    1. `POST /api/v1/invitations` with the desired `role` to get a single-use `inviteUrl`.
-    2. Send the user the `inviteUrl`; they sign in with an OAuth provider.
-    3. Bouncer creates the user, assigns the role, and redirects them back to your app.
-  version: 0.2.0
+    ## How the `sub` lines up
+    Bouncer keys users on the OAuth `sub` claim of the provider they signed in with during
+    invitation acceptance. The same `sub` your application receives from its own OAuth login
+    is the value to send to `/api/v1/access` — that is how Bouncer recognises the user across
+    the two systems.
+  version: 0.3.0
 
 servers:
   - url: http://localhost:3000
@@ -43,47 +51,6 @@ components:
       type: http
       scheme: bearer
       description: API key generated in the Admin UI (starts with "bncr_")
-
-  headers:
-    RateLimit-Limit:
-      description: The per-API-key request ceiling for the current window (300/min).
-      schema:
-        type: integer
-        example: 300
-    RateLimit-Remaining:
-      description: Requests remaining in the current window before throttling.
-      schema:
-        type: integer
-        example: 297
-    RateLimit-Reset:
-      description: Seconds until the current rate-limit window resets.
-      schema:
-        type: integer
-        example: 42
-    Retry-After:
-      description: Seconds to wait before retrying (sent only on 429).
-      schema:
-        type: integer
-        example: 42
-
-  responses:
-    TooManyRequests:
-      description: Per-API-key rate limit exceeded (300 requests/minute)
-      headers:
-        RateLimit-Limit:
-          $ref: '#/components/headers/RateLimit-Limit'
-        RateLimit-Remaining:
-          $ref: '#/components/headers/RateLimit-Remaining'
-        RateLimit-Reset:
-          $ref: '#/components/headers/RateLimit-Reset'
-        Retry-After:
-          $ref: '#/components/headers/Retry-After'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-          example:
-            error: too_many_requests
 
   schemas:
     AccessGranted:
@@ -217,13 +184,6 @@ paths:
       responses:
         '200':
           description: User has an active role in this application
-          headers:
-            RateLimit-Limit:
-              $ref: '#/components/headers/RateLimit-Limit'
-            RateLimit-Remaining:
-              $ref: '#/components/headers/RateLimit-Remaining'
-            RateLimit-Reset:
-              $ref: '#/components/headers/RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -281,17 +241,16 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: user_not_found
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
 
   /api/v1/invitations:
     post:
       summary: Create a user invitation
       description: |
         Mint a single-use invitation for the application associated with the API key. Deliver the
-        returned `inviteUrl` to the user; when they accept it (signing in via an OAuth provider),
-        Bouncer creates the user and assigns the requested role in this application, then sends them
-        to `redirectUri` (or a confirmation page).
+        returned `inviteUrl` to the user; when they open it and sign in via an OAuth provider on
+        the Bouncer-hosted accept page, Bouncer creates (or finds) the user, assigns the requested
+        role within this application, and redirects them to `redirectUri` (or to a Bouncer
+        confirmation page if omitted).
 
         Outcomes:
         - **201** — invitation created.
@@ -307,13 +266,6 @@ paths:
       responses:
         '201':
           description: Invitation created
-          headers:
-            RateLimit-Limit:
-              $ref: '#/components/headers/RateLimit-Limit'
-            RateLimit-Remaining:
-              $ref: '#/components/headers/RateLimit-Remaining'
-            RateLimit-Reset:
-              $ref: '#/components/headers/RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -345,5 +297,3 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: role_not_found
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
