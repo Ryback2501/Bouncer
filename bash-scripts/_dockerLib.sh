@@ -35,22 +35,33 @@ ensure_env_file() {
   chmod 600 "$ENV_FILE"
 }
 
-# Materialize backend/.env → backend/.env.docker with surrounding double/single quotes
-# stripped from each VALUE. Comments and blank lines pass through. The result is what
-# compose loads via `env_file: [{ path: ..., format: raw }]`, which disables variable
-# interpolation so values containing literal `$` (random SESSION_SECRET / ENCRYPTION_KEY,
-# some OAuth secrets) reach the container intact.
+# Materialize backend/.env → backend/.env.docker, normalizing each VALUE so compose
+# (with `format: raw`) receives clean values. For each KEY=VALUE line:
+#   1. Strip trailing inline ` # comment` (whitespace + `#` starts a comment, per the
+#      dotenv convention `.env.example` follows).
+#   2. Trim trailing whitespace.
+#   3. Strip surrounding double or single quotes from the result.
+# Comments and blank lines pass through. The result is what compose loads via
+# `env_file: [{ path: ..., format: raw }]`, which disables variable interpolation so
+# values containing literal `$` (random SESSION_SECRET / ENCRYPTION_KEY, some OAuth
+# secrets) reach the container intact.
 materialize_env_file() {
   [[ -f "$ENV_FILE" ]] || { echo "ERROR: $ENV_FILE missing" >&2; return 1; }
   awk '
+    function trim_trailing(s) { sub(/[[:space:]]+$/, "", s); return s }
     /^[[:space:]]*#/ || /^[[:space:]]*$/ { print; next }
     /=/ {
       eq = index($0, "=")
       key = substr($0, 1, eq)
       val = substr($0, eq + 1)
+      if (match(val, /[[:space:]]#/)) {
+        val = substr(val, 1, RSTART - 1)
+      }
+      val = trim_trailing(val)
       first = substr(val, 1, 1)
       last  = substr(val, length(val), 1)
-      if ((first == "\"" && last == "\"") || (first == "\047" && last == "\047")) {
+      if (length(val) >= 2 \
+          && ((first == "\"" && last == "\"") || (first == "\047" && last == "\047"))) {
         val = substr(val, 2, length(val) - 2)
       }
       print key val
