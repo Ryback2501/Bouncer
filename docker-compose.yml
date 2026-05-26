@@ -1,19 +1,17 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: bouncer
-      POSTGRES_PASSWORD: bouncer
-      POSTGRES_DB: bouncer
+      POSTGRES_USER: ${POSTGRES_USER:-bouncer}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bouncer}
+      POSTGRES_DB: ${POSTGRES_DB:-bouncer}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bouncer"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bouncer}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -25,8 +23,21 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    # The bash wrappers (bash-scripts/_dockerLib.sh) materialize backend/.env into a
+    # `.env.docker` sibling with surrounding quotes stripped from each value, and we read
+    # that with `format: raw` so compose does NOT interpolate `$` characters inside
+    # values (random SESSION_SECRET / ENCRYPTION_KEY, some OAuth secrets contain literal
+    # `$`, which the default interpolation mode silently truncates).
     env_file:
-      - ./backend/.env
+      - path: ./backend/.env.docker
+        format: raw
+    environment:
+      # Container-correct overrides. Win over env_file: for keys present in both, so the
+      # user's host-side .env (DATABASE_URL=…@localhost, FRONTEND_URL=…:5173) stays usable
+      # for bash-scripts/runBouncer.sh while the dockerized stack gets compose-network
+      # hostnames and the host port the nginx container publishes.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bouncer}:${POSTGRES_PASSWORD:-bouncer}@postgres:5432/${POSTGRES_DB:-bouncer}
+      FRONTEND_URL: http://localhost
     depends_on:
       postgres:
         condition: service_healthy

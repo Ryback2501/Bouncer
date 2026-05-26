@@ -241,9 +241,29 @@ jobs:
         run: npm run test
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report
           path: e2e/playwright-report/
+          retention-days: 7
+
+  docker:
+    name: Docker stack smoke test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Smoke-test the dockerized stack
+        run: bash bash-scripts/validateDockerStack.sh
+
+      - name: Upload docker compose logs
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: docker-compose-logs
+          path: .docker-validate-logs/
           retention-days: 7
