@@ -14,7 +14,8 @@ test.describe('Dashboard', () => {
     const main = page.locator('main')
     await expect(main.getByText('Applications')).toBeVisible()
     await expect(main.getByText('Users')).toBeVisible()
-    await expect(main.getByText('Roles')).toBeVisible()
+    await expect(main.getByText('Assignments')).toBeVisible()
+    await expect(main.getByText('Invitations')).toBeVisible()
   })
 })
 

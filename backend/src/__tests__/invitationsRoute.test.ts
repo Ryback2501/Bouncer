@@ -9,21 +9,33 @@ vi.mock('../services/invitationService', () => ({
   deleteInvitation: vi.fn(),
 }))
 
-vi.mock('../lib/bouncerDefaults', () => ({
-  ensureBouncerDefaults: vi.fn().mockResolvedValue({
-    app: { id: 'bouncer-app' },
-    role: { id: 'admin-role' },
-  }),
+vi.mock('../prisma', () => ({
+  prisma: {
+    role: { findUnique: vi.fn() },
+    application: { findUnique: vi.fn() },
+  },
 }))
 
 import * as svc from '../services/invitationService'
+import { prisma } from '../prisma'
 import router from '../routes/admin/invitations'
 
+const p = prisma as unknown as {
+  role: { findUnique: ReturnType<typeof vi.fn> }
+  application: { findUnique: ReturnType<typeof vi.fn> }
+}
+
 const mockInvitation = {
-  id: 'i1', token: 'tok1', createdById: 'u1',
+  id: 'i1',
+  applicationId: '00000000-0000-0000-0000-000000000a01',
+  roleId: '00000000-0000-0000-0000-000000000b01',
   inviteUrl: 'http://localhost:5173/invite/tok1',
   createdBy: { name: 'Alice', email: null },
-  expiresAt: new Date().toISOString(), usedAt: null, createdAt: new Date().toISOString(),
+  application: { id: '00000000-0000-0000-0000-000000000a01', name: 'My App', customId: 'my-app' },
+  role: { id: '00000000-0000-0000-0000-000000000b01', name: 'Editor', customId: 'editor' },
+  expiresAt: new Date().toISOString(),
+  usedAt: null,
+  createdAt: new Date().toISOString(),
 }
 
 const mockUser = { id: 'u1', name: 'Alice' }
@@ -42,30 +54,62 @@ function makeApp() {
 describe('GET /invitations', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns list of invitations', async () => {
+  it('returns list of invitations across all apps (no filter)', async () => {
     vi.mocked(svc.listInvitations).mockResolvedValue([mockInvitation] as unknown as Awaited<ReturnType<typeof svc.listInvitations>>)
     const res = await request(makeApp()).get('/')
     expect(res.status).toBe(200)
     expect(res.body).toHaveLength(1)
-    // Admin list is scoped to the Bouncer app.
-    expect(svc.listInvitations).toHaveBeenCalledWith('bouncer-app')
+    // The admin listing is cross-app (no applicationId filter).
+    expect(svc.listInvitations).toHaveBeenCalledWith()
   })
 })
 
 describe('POST /invitations', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('creates invitation and returns 201', async () => {
+  it('creates an invitation for the given application + role and returns 201', async () => {
+    p.role.findUnique.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000b01', applicationId: '00000000-0000-0000-0000-000000000a01' })
     vi.mocked(svc.createInvitation).mockResolvedValue(mockInvitation as unknown as Awaited<ReturnType<typeof svc.createInvitation>>)
-    const res = await request(makeApp()).post('/')
+
+    const res = await request(makeApp())
+      .post('/')
+      .send({ applicationId: '00000000-0000-0000-0000-000000000a01', roleId: '00000000-0000-0000-0000-000000000b01' })
+
     expect(res.status).toBe(201)
     expect(res.body.inviteUrl).toBe(mockInvitation.inviteUrl)
-    // Admin invites are scoped to the Bouncer app + admin role, created by the admin user.
     expect(svc.createInvitation).toHaveBeenCalledWith({
-      applicationId: 'bouncer-app',
-      roleId: 'admin-role',
+      applicationId: '00000000-0000-0000-0000-000000000a01',
+      roleId: '00000000-0000-0000-0000-000000000b01',
       createdById: 'u1',
+      redirectUri: null,
     })
+  })
+
+  it('returns 400 when the role does not belong to the application', async () => {
+    p.role.findUnique.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000b01', applicationId: '00000000-0000-0000-0000-000000000099' })
+    const res = await request(makeApp())
+      .post('/')
+      .send({ applicationId: '00000000-0000-0000-0000-000000000a01', roleId: '00000000-0000-0000-0000-000000000b01' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('role_not_in_application')
+    expect(svc.createInvitation).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 for a redirectUri whose origin is not in the application allowlist', async () => {
+    p.role.findUnique.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000b01', applicationId: '00000000-0000-0000-0000-000000000a01' })
+    p.application.findUnique.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000a01', redirectUris: ['https://app.example.com'] })
+
+    const res = await request(makeApp())
+      .post('/')
+      .send({ applicationId: '00000000-0000-0000-0000-000000000a01', roleId: '00000000-0000-0000-0000-000000000b01', redirectUri: 'https://evil.example.com/x' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('redirect_uri_not_allowed')
+    expect(svc.createInvitation).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when body validation fails (missing applicationId)', async () => {
+    const res = await request(makeApp()).post('/').send({ roleId: '00000000-0000-0000-0000-000000000b01' })
+    expect(res.status).toBe(400)
   })
 })
 

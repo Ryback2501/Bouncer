@@ -45,7 +45,11 @@ describe('invitationService', () => {
           createdById: 'u1',
           redirectUri: 'https://app.example/welcome',
         }),
-        include: { createdBy: { select: { name: true, email: true } } },
+        include: {
+          createdBy: { select: { name: true, email: true } },
+          application: { select: { id: true, name: true, customId: true } },
+          role: { select: { id: true, name: true, customId: true } },
+        },
       }))
       // expiresAt should be ~24h from now
       const calledData = (p.create.mock.calls[0][0] as { data: { expiresAt: Date } }).data
@@ -78,7 +82,11 @@ describe('invitationService', () => {
       expect(p.findMany).toHaveBeenCalledWith({
         where: undefined,
         orderBy: { createdAt: 'desc' },
-        include: { createdBy: { select: { name: true, email: true } } },
+        include: {
+          createdBy: { select: { name: true, email: true } },
+          application: { select: { id: true, name: true, customId: true } },
+          role: { select: { id: true, name: true, customId: true } },
+        },
       })
     })
 
@@ -88,7 +96,11 @@ describe('invitationService', () => {
       expect(p.findMany).toHaveBeenCalledWith({
         where: { applicationId: 'a1' },
         orderBy: { createdAt: 'desc' },
-        include: { createdBy: { select: { name: true, email: true } } },
+        include: {
+          createdBy: { select: { name: true, email: true } },
+          application: { select: { id: true, name: true, customId: true } },
+          role: { select: { id: true, name: true, customId: true } },
+        },
       })
     })
   })
