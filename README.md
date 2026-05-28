@@ -16,12 +16,81 @@ The Bouncer admin portal is itself modelled as an application inside Bouncer. Th
 
 ## Quick start
 
-Bouncer ships as a single Docker image that serves both the admin UI and the API from one origin.
+Bouncer ships as a single Docker image that serves both the admin UI and the API from one origin. Pick whichever path fits your situation.
 
-1. Copy `backend/.env.example` to `backend/.env` and fill in the secrets (see the [OAuth provider setup](#oauth-provider-setup) section below — at least one provider must be configured to sign in).
+### From Docker Hub (no clone needed)
+
+The official image is published at [`ryback2501/bouncer`](https://hub.docker.com/r/ryback2501/bouncer) on Docker Hub. It's multi-arch (`linux/amd64` + `linux/arm64`) so it runs on standard cloud x86, AWS Graviton, Oracle Cloud Free Tier ARM Ampere, Apple Silicon dev machines, and Raspberry Pi 4/5 alike.
+
+Two tags are pushed per release:
+
+- `ryback2501/bouncer:<version>` — immutable, pin-able (e.g. `ryback2501/bouncer:0.3.0`).
+- `ryback2501/bouncer:latest` — always points at the newest published version.
+
+The minimal compose file looks like this (you still need to provide the OAuth secrets — see the [OAuth provider setup](#oauth-provider-setup) section):
+
+```yaml
+# compose.yml
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bouncer
+      POSTGRES_PASSWORD: bouncer
+      POSTGRES_DB: bouncer
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bouncer"]
+      interval: 5s
+
+  bouncer:
+    image: ryback2501/bouncer:latest
+    restart: unless-stopped
+    ports:
+      - "80:3000"          # browse http://localhost
+    environment:
+      DATABASE_URL: postgresql://bouncer:bouncer@postgres:5432/bouncer
+      FRONTEND_URL: http://localhost
+      NODE_ENV: production
+      SESSION_SECRET: <openssl rand -base64 48>
+      ENCRYPTION_KEY: <openssl rand -base64 32>
+      ADMIN_ALLOWED_EMAILS: you@example.com
+      # OAuth providers — fill in the client id + secret for each provider you want to
+      # enable (at least one required). See the OAuth provider setup section below for
+      # where to register the app and which scopes/redirect URI to configure.
+      GOOGLE_CLIENT_ID:
+      GOOGLE_CLIENT_SECRET:
+      GOOGLE_CALLBACK_URL: http://localhost/auth/google/callback
+      MICROSOFT_CLIENT_ID:
+      MICROSOFT_CLIENT_SECRET:
+      MICROSOFT_TENANT_ID: common
+      MICROSOFT_CALLBACK_URL: http://localhost/auth/microsoft/callback
+      GITHUB_CLIENT_ID:
+      GITHUB_CLIENT_SECRET:
+      GITHUB_CALLBACK_URL: http://localhost/auth/github/callback
+      LINKEDIN_CLIENT_ID:
+      LINKEDIN_CLIENT_SECRET:
+      LINKEDIN_CALLBACK_URL: http://localhost/auth/linkedin/callback
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+```
+
+Start the stack: `docker compose up -d`, then open `http://localhost` and sign in via OAuth. The first sign-in matching `ADMIN_ALLOWED_EMAILS` becomes the global administrator.
+
+### From source (for development or local hacking)
+
+Clone the repo, then:
+
+1. Copy `backend/.env.example` to `backend/.env` and fill in the secrets (see the [OAuth provider setup](#oauth-provider-setup) section — at least one provider must be configured to sign in).
 2. Generate a `SESSION_SECRET` (≥32 chars in production): `openssl rand -base64 48`
 3. Generate an `ENCRYPTION_KEY` (required in production, encrypts user emails at rest): `openssl rand -base64 32`
-4. Bring up Postgres + Bouncer: `bash bash-scripts/runBouncer.sh`
+4. Bring up Postgres + Bouncer (builds the image locally): `bash bash-scripts/runBouncer.sh`
 5. Open `http://localhost` in a browser. The first OAuth sign-in becomes the global admin.
 
 To stop: `bash bash-scripts/stopBouncer.sh` (preserves the Postgres volume). Use `--purge` to also drop the volume and locally-built images.
