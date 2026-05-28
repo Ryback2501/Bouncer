@@ -17,8 +17,10 @@ test.describe('Roles', () => {
     await page.getByRole('link', { name: /Roles/i }).first().click()
     await expect(page).toHaveURL(/\/applications\/.+\/roles/)
 
-    // Open the New Role form
-    await page.getByRole('button', { name: /New Role/i }).click()
+    // Open the New Role form. RoleList renders the "New Role" button in both the
+    // header AND the empty-state action when the app has no roles yet — `.first()`
+    // disambiguates without coupling to which one renders.
+    await page.getByRole('button', { name: /New Role/i }).first().click()
 
     // Fill in the form
     await page.getByLabel('Name').fill(ROLE_NAME)
