@@ -22,7 +22,8 @@ describe('Sidebar', () => {
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
     expect(screen.getByText('Applications')).toBeInTheDocument()
     expect(screen.getByText('Users')).toBeInTheDocument()
-    expect(screen.getByText('Admin Access')).toBeInTheDocument()
+    expect(screen.getByText('Assignments')).toBeInTheDocument()
+    expect(screen.getByText('Invitations')).toBeInTheDocument()
   })
 
   it('calls onClose when mobile close button is clicked', () => {

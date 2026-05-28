@@ -127,3 +127,60 @@ describe('Role assignments — integration', () => {
     expect(res.status).toBe(404)
   })
 })
+
+describe('GET /admin/assignments (cross-app listing)', () => {
+  let secondAppId: string
+  let secondRoleId: string
+  let secondUserId: string
+
+  beforeAll(async () => {
+    // Add a row in a second application so the listing must return assignments from > 1 app.
+    const a2 = await prisma.application.create({
+      data: { name: 'Assignments Test App 2', customId: `${PREFIX}-app2` },
+    })
+    secondAppId = a2.id
+    const role2 = await prisma.role.create({
+      data: { name: 'Reader', customId: 'reader', applicationId: secondAppId },
+    })
+    secondRoleId = role2.id
+    const u2 = await prisma.user.create({
+      data: { name: 'Second User', sub: `${PREFIX}-sub2`, provider: 'github' },
+    })
+    secondUserId = u2.id
+    await prisma.userRole.create({
+      data: { userId: secondUserId, applicationId: secondAppId, roleId: secondRoleId, active: true },
+    })
+    // Restore the row in the first app that the prior tests removed.
+    await prisma.userRole.create({
+      data: { userId, applicationId: appId, roleId: roleIdA, active: true },
+    })
+  })
+
+  afterAll(async () => {
+    await prisma.userRole.deleteMany({ where: { userId: secondUserId } })
+    await prisma.user.deleteMany({ where: { id: secondUserId } })
+    await prisma.application.deleteMany({ where: { id: secondAppId } })
+  })
+
+  it('returns rows from multiple applications with user, role, and application includes', async () => {
+    const res = await request(app).get('/admin/assignments')
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body)).toBe(true)
+
+    const ours = res.body.filter((row: { applicationId: string }) =>
+      [appId, secondAppId].includes(row.applicationId)
+    )
+    expect(ours.map((r: { applicationId: string }) => r.applicationId).sort()).toEqual(
+      [appId, secondAppId].sort()
+    )
+
+    for (const row of ours) {
+      expect(row).toHaveProperty('user.id')
+      expect(row).toHaveProperty('user.provider')
+      expect(row).toHaveProperty('role.id')
+      expect(row).toHaveProperty('role.customId')
+      expect(row).toHaveProperty('application.id')
+      expect(row).toHaveProperty('application.customId')
+    }
+  })
+})

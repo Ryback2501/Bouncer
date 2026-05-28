@@ -15,7 +15,7 @@ import { getApplications, getApplication, createApplication, updateApplication, 
 import { getRoles, createRole, updateRole, deleteRole } from '../api/roles'
 import { getUsers, getUser, createUser, updateUser, deleteUser } from '../api/users'
 import { getApiKeys, createApiKey, deleteApiKey } from '../api/apiKeys'
-import { getInvitations, createInvitation, deleteInvitation, getAdmins } from '../api/invitations'
+import { getInvitations, createInvitation, deleteInvitation } from '../api/invitations'
 import { assignRole, removeRole } from '../api/assignments'
 
 const c = client as unknown as { get: Mock; post: Mock; patch: Mock; put: Mock; delete: Mock }
@@ -155,22 +155,20 @@ describe('Invitations API', () => {
     expect(c.get).toHaveBeenCalledWith('/invitations')
   })
 
-  it('createInvitation calls POST /invitations', async () => {
+  it('createInvitation calls POST /invitations with applicationId + roleId + optional redirectUri', async () => {
     c.post.mockResolvedValue({ data: {} })
-    await createInvitation()
-    expect(c.post).toHaveBeenCalledWith('/invitations')
+    await createInvitation({ applicationId: 'app1', roleId: 'role1' })
+    expect(c.post).toHaveBeenCalledWith('/invitations', { applicationId: 'app1', roleId: 'role1' })
+    await createInvitation({ applicationId: 'app1', roleId: 'role1', redirectUri: 'https://x/y' })
+    expect(c.post).toHaveBeenCalledWith('/invitations', {
+      applicationId: 'app1', roleId: 'role1', redirectUri: 'https://x/y',
+    })
   })
 
   it('deleteInvitation calls DELETE /invitations/:id', async () => {
     c.delete.mockResolvedValue({})
     await deleteInvitation('inv1')
     expect(c.delete).toHaveBeenCalledWith('/invitations/inv1')
-  })
-
-  it('getAdmins calls GET /admins', async () => {
-    c.get.mockResolvedValue({ data: [] })
-    await getAdmins()
-    expect(c.get).toHaveBeenCalledWith('/admins')
   })
 })
 

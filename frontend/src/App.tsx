@@ -10,7 +10,8 @@ import { RoleList } from './pages/Roles/RoleList'
 import { UserList } from './pages/Users/UserList'
 import { UserDetail } from './pages/Users/UserDetail'
 import { ApiKeyList } from './pages/ApiKeys/ApiKeyList'
-import { AdminList } from './pages/Admins/AdminList'
+import { AssignmentList } from './pages/Assignments/AssignmentList'
+import { InvitationList } from './pages/Invitations/InvitationList'
 import { InviteAccept } from './pages/InviteAccept'
 import { Invited } from './pages/Invited'
 
@@ -36,7 +37,8 @@ function ProtectedRoutes() {
         <Route path="applications/:appId/api-keys" element={<ApiKeyList />} />
         <Route path="users" element={<UserList />} />
         <Route path="users/:userId" element={<UserDetail />} />
-        <Route path="admins" element={<AdminList />} />
+        <Route path="assignments" element={<AssignmentList />} />
+        <Route path="invitations" element={<InvitationList />} />
       </Route>
     </Routes>
   )

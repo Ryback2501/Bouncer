@@ -9,7 +9,7 @@ import { createHash, randomBytes } from 'crypto'
 import { prisma } from '../../prisma'
 import { findOrCreateUser } from '../../passport'
 import { ensureBouncerDefaults } from '../../lib/bouncerDefaults'
-import { makeTestApp } from './testApp'
+import { makeTestApp, testAdmin } from './testApp'
 
 const app = makeTestApp()
 const PREFIX = `int-invite-${randomBytes(4).toString('hex')}`
@@ -55,6 +55,21 @@ beforeAll(async () => {
 
   rawApiKey = `bncr_${randomBytes(32).toString('hex')}`
   await prisma.apiKey.create({ data: { applicationId: app1Id, keyHash: hash(rawApiKey), label: 'invite' } })
+
+  // The admin POST route writes Invitation.createdById = req.user.id. Ensure a real user row
+  // exists for the synthetic test admin so the FK resolves.
+  await prisma.user.upsert({
+    where: { id: testAdmin.id! },
+    update: {},
+    create: {
+      id: testAdmin.id!,
+      name: testAdmin.name!,
+      email: testAdmin.email!,
+      sub: testAdmin.sub!,
+      provider: testAdmin.provider!,
+      isGlobalAdmin: true,
+    },
+  })
 })
 
 afterAll(async () => {
@@ -184,5 +199,55 @@ describe('invitation acceptance (findOrCreateUser)', () => {
       { sub: `${PREFIX}-dave`, provider: 'google', name: 'Dave', email: 'dave@test.com' }, raw,
     )
     expect(result!.outcome.kind).toBe('admin')
+  })
+})
+
+describe('POST /admin/invitations (admin UI cross-app mint)', () => {
+  it('creates an invitation for a non-Bouncer app + role (201) with creator + includes', async () => {
+    const res = await request(app)
+      .post('/admin/invitations')
+      .send({ applicationId: app1Id, roleId: editorRoleId, redirectUri: 'https://app.example.com/welcome' })
+
+    expect(res.status).toBe(201)
+    expect(res.body.inviteUrl).toMatch(/\/invite\/[0-9a-f]{64}$/)
+    expect(res.body.applicationId).toBe(app1Id)
+    expect(res.body.roleId).toBe(editorRoleId)
+    expect(res.body.application?.customId).toBe(`${PREFIX}-app1`)
+    expect(res.body.role?.customId).toBe('editor')
+  })
+
+  it('rejects a role that does not belong to the supplied application (400)', async () => {
+    // editorRoleId belongs to app1; pair it with app2 to force the mismatch.
+    const res = await request(app)
+      .post('/admin/invitations')
+      .send({ applicationId: app2Id, roleId: editorRoleId })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('role_not_in_application')
+  })
+
+  it('rejects a redirectUri whose origin is not in the app allowlist (400)', async () => {
+    const res = await request(app)
+      .post('/admin/invitations')
+      .send({ applicationId: app1Id, roleId: editorRoleId, redirectUri: 'https://evil.example.com/x' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('redirect_uri_not_allowed')
+  })
+})
+
+describe('GET /admin/invitations (cross-app listing)', () => {
+  it('returns invitations across all applications with application + role includes', async () => {
+    const res = await request(app).get('/admin/invitations')
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body)).toBe(true)
+    const ours = res.body.filter((inv: { applicationId: string }) =>
+      [app1Id, app2Id].includes(inv.applicationId)
+    )
+    expect(ours.length).toBeGreaterThan(0)
+    for (const inv of ours) {
+      expect(inv).toHaveProperty('application.id')
+      expect(inv).toHaveProperty('application.customId')
+      expect(inv).toHaveProperty('role.id')
+      expect(inv).toHaveProperty('role.customId')
+    }
   })
 })

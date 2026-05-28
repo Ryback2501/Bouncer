@@ -1,12 +1,13 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, AppWindow, Users, X, Shield, UserCog } from 'lucide-react'
+import { LayoutDashboard, AppWindow, Users, X, Shield, Link as LinkIcon, Mail } from 'lucide-react'
 import { cn } from '../shared/cn'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/applications', label: 'Applications', icon: AppWindow },
   { to: '/users', label: 'Users', icon: Users },
-  { to: '/admins', label: 'Admin Access', icon: UserCog },
+  { to: '/assignments', label: 'Assignments', icon: LinkIcon },
+  { to: '/invitations', label: 'Invitations', icon: Mail },
 ]
 
 interface SidebarProps {
