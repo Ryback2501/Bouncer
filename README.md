@@ -57,10 +57,22 @@ services:
       SESSION_SECRET: <openssl rand -base64 48>
       ENCRYPTION_KEY: <openssl rand -base64 32>
       ADMIN_ALLOWED_EMAILS: you@example.com
-      # OAuth provider credentials (at least one required); see OAuth provider setup below
+      # OAuth providers — fill in the client id + secret for each provider you want to
+      # enable (at least one required). See the OAuth provider setup section below for
+      # where to register the app and which scopes/redirect URI to configure.
       GOOGLE_CLIENT_ID:
       GOOGLE_CLIENT_SECRET:
       GOOGLE_CALLBACK_URL: http://localhost/auth/google/callback
+      MICROSOFT_CLIENT_ID:
+      MICROSOFT_CLIENT_SECRET:
+      MICROSOFT_TENANT_ID: common
+      MICROSOFT_CALLBACK_URL: http://localhost/auth/microsoft/callback
+      GITHUB_CLIENT_ID:
+      GITHUB_CLIENT_SECRET:
+      GITHUB_CALLBACK_URL: http://localhost/auth/github/callback
+      LINKEDIN_CLIENT_ID:
+      LINKEDIN_CLIENT_SECRET:
+      LINKEDIN_CALLBACK_URL: http://localhost/auth/linkedin/callback
     depends_on:
       postgres:
         condition: service_healthy
