@@ -216,9 +216,15 @@ jobs:
       - name: Copy Prisma client to e2e
         run: cp -r backend/node_modules/.prisma e2e/node_modules/
 
+      # ubuntu-latest already ships with every system lib Playwright Chromium needs, so
+      # `--with-deps` (which shells out to apt-get) is redundant work — and the apt step
+      # has been hanging intermittently for tens of minutes when Ubuntu's mirrors are
+      # flaky. Just download the browser binary. The 5-minute timeout fails fast if a
+      # CDN-side issue ever bites instead, so we triage in minutes rather than hours.
       - name: Install Playwright browsers
         working-directory: e2e
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 5
+        run: npx playwright install chromium
 
       - name: Run database migrations
         working-directory: backend
