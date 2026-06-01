@@ -6,14 +6,12 @@ import { getRoles } from '../../api/roles'
 import { createInvitation } from '../../api/invitations'
 import { Modal } from '../../components/shared/Modal'
 import { Select } from '../../components/shared/Select'
-import { Input } from '../../components/shared/Input'
 import { Button } from '../../components/shared/Button'
 import { CopyableCode } from '../../components/shared/CopyableCode'
 import { useToast } from '../../components/shared/useToast'
 
 interface FormData {
   roleId: string
-  redirectUri: string
 }
 
 interface Props {
@@ -33,8 +31,11 @@ function CreateInvitationForm({
   const qc = useQueryClient()
   const toast = useToast()
   const [selectedAppId, setSelectedAppId] = useState('')
-  const { register, handleSubmit, formState: { errors }, setError } = useForm<FormData>({
-    defaultValues: { roleId: '', redirectUri: '' },
+  // null = "use derived default"; '' = user explicitly chose (none); other = chosen URI.
+  // Reset to null when the application changes so the new app's default reapplies.
+  const [redirectUriChoice, setRedirectUriChoice] = useState<string | null>(null)
+  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+    defaultValues: { roleId: '' },
   })
 
   const { data: apps = [] } = useQuery({ queryKey: ['applications'], queryFn: getApplications })
@@ -50,12 +51,19 @@ function CreateInvitationForm({
     enabled: !!effectiveAppId,
   })
 
+  // Redirect URI is chosen from the application's `redirectUris` allowlist (or `(none)`),
+  // so the backend's origin-match validation can't fail at submit time. If the app has
+  // exactly one URI, preselect it; otherwise default to `(none)`.
+  const redirectUriOptions = selectedApp?.redirectUris ?? []
+  const defaultRedirectUri = redirectUriOptions.length === 1 ? redirectUriOptions[0] : ''
+  const effectiveRedirectUri = redirectUriChoice ?? defaultRedirectUri
+
   const mutation = useMutation({
     mutationFn: (data: FormData) =>
       createInvitation({
         applicationId: effectiveAppId,
         roleId: data.roleId,
-        redirectUri: data.redirectUri.trim() || undefined,
+        redirectUri: effectiveRedirectUri || undefined,
       }),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['invitations'] })
@@ -65,39 +73,15 @@ function CreateInvitationForm({
     onError: () => toast.error('Failed to create invitation'),
   })
 
-  function onSubmit(data: FormData) {
-    // Best-effort client-side redirectUri origin check against the chosen app's allowlist.
-    // Backend remains the source of truth via 400 `redirect_uri_not_allowed`.
-    if (data.redirectUri.trim() && selectedApp?.redirectUris?.length) {
-      try {
-        const candidate = new URL(data.redirectUri)
-        const allowed = selectedApp.redirectUris.some(allowedUri => {
-          try {
-            return new URL(allowedUri).origin === candidate.origin
-          } catch {
-            return false
-          }
-        })
-        if (!allowed) {
-          setError('redirectUri', {
-            message: `Origin not in this application's allowlist: ${selectedApp.redirectUris.join(', ')}`,
-          })
-          return
-        }
-      } catch {
-        setError('redirectUri', { message: 'Must be a valid URL' })
-        return
-      }
-    }
-    mutation.mutate(data)
-  }
-
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-4">
       <Select
         label="Application"
         value={effectiveAppId}
-        onChange={e => setSelectedAppId(e.target.value)}
+        onChange={e => {
+          setSelectedAppId(e.target.value)
+          setRedirectUriChoice(null) // reapply the new app's default
+        }}
       >
         <option value="">— Select an application —</option>
         {apps.map(app => (
@@ -118,17 +102,21 @@ function CreateInvitationForm({
       </Select>
 
       <div className="space-y-1">
-        <Input
+        <Select
           label="Redirect URI (optional)"
-          type="url"
-          placeholder="https://app.example.com/welcome"
-          {...register('redirectUri')}
-          error={errors.redirectUri?.message}
-        />
+          value={effectiveRedirectUri}
+          onChange={e => setRedirectUriChoice(e.target.value)}
+          disabled={!effectiveAppId}
+        >
+          <option value="">(none — show confirmation page)</option>
+          {redirectUriOptions.map(uri => (
+            <option key={uri} value={uri}>{uri}</option>
+          ))}
+        </Select>
         <p className="text-xs text-gray-500">
-          {selectedApp?.redirectUris?.length
-            ? `Must match one of the application's allowed origins.`
-            : 'Where to send the invitee after acceptance. Leave blank for a confirmation page.'}
+          {redirectUriOptions.length > 0
+            ? 'Where to send the invitee after they accept — pick one of the application’s registered redirect URIs.'
+            : 'This application has no redirect URIs configured. Add some on its Applications page to enable redirecting; for now invitations land on a confirmation page.'}
         </p>
       </div>
 
