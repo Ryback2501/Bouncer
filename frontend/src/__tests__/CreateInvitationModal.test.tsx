@@ -94,10 +94,11 @@ describe('CreateInvitationModal', () => {
     await waitFor(() => expect(screen.getByText('http://localhost/invite/abc')).toBeInTheDocument())
   })
 
-  it('rejects a redirectUri whose origin is not in the application allowlist', async () => {
+  it('redirect URI dropdown lists each entry from the application’s redirectUris', async () => {
     vi.mocked(getApplications).mockResolvedValue([
       { id: 'app-2', name: 'CMS', customId: 'cms',
-        redirectUris: ['https://app.example.com'], createdAt: '', updatedAt: '' },
+        redirectUris: ['https://cms.example.com/welcome', 'https://staging.cms.example.com/welcome'],
+        createdAt: '', updatedAt: '' },
     ])
     vi.mocked(getRoles).mockResolvedValue([
       { id: 'role-1', name: 'Editor', customId: 'editor', applicationId: 'app-2', createdAt: '' },
@@ -105,13 +106,42 @@ describe('CreateInvitationModal', () => {
 
     renderModal()
     await waitFor(() => expect(screen.getByRole('option', { name: 'Editor' })).toBeInTheDocument())
-    fireEvent.change(screen.getByLabelText(/^role/i), { target: { value: 'role-1' } })
-    fireEvent.change(screen.getByLabelText(/redirect uri/i), {
-      target: { value: 'https://evil.example.com/x' },
+
+    expect(screen.getByRole('option', { name: /none — show confirmation page/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'https://cms.example.com/welcome' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'https://staging.cms.example.com/welcome' })).toBeInTheDocument()
+  })
+
+  it('preselects the application’s only redirect URI and submits it in the payload', async () => {
+    vi.mocked(getApplications).mockResolvedValue([
+      { id: 'app-2', name: 'CMS', customId: 'cms',
+        redirectUris: ['https://cms.example.com/welcome'], createdAt: '', updatedAt: '' },
+    ])
+    vi.mocked(getRoles).mockResolvedValue([
+      { id: 'role-1', name: 'Editor', customId: 'editor', applicationId: 'app-2', createdAt: '' },
+    ])
+    vi.mocked(createInvitation).mockResolvedValue({
+      id: 'i1', applicationId: 'app-2', roleId: 'role-1', redirectUri: 'https://cms.example.com/welcome',
+      expiresAt: '', usedAt: null, createdAt: '', createdBy: null,
+      application: { id: 'app-2', name: 'CMS', customId: 'cms' },
+      role: { id: 'role-1', name: 'Editor', customId: 'editor' },
+      inviteUrl: 'http://localhost/invite/abc',
     })
+
+    renderModal()
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Editor' })).toBeInTheDocument())
+
+    // The sole redirectUri is auto-selected — confirmed by the dropdown's value.
+    expect((screen.getByLabelText(/redirect uri/i) as HTMLSelectElement).value)
+      .toBe('https://cms.example.com/welcome')
+
+    fireEvent.change(screen.getByLabelText(/^role/i), { target: { value: 'role-1' } })
     fireEvent.click(screen.getByRole('button', { name: /create invitation/i }))
 
-    await waitFor(() => expect(screen.getByText(/origin not in this application/i)).toBeInTheDocument())
-    expect(createInvitation).not.toHaveBeenCalled()
+    await waitFor(() => expect(createInvitation).toHaveBeenCalledWith({
+      applicationId: 'app-2',
+      roleId: 'role-1',
+      redirectUri: 'https://cms.example.com/welcome',
+    }))
   })
 })

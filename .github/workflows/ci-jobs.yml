@@ -166,6 +166,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: integration
 
+    # Run the job inside Microsoft's official Playwright image. Chromium and every system
+    # library it needs are preinstalled and validated by Microsoft — that eliminates the
+    # `Install Playwright browsers` step entirely, which had been hanging silently for
+    # 5–35 minutes after the browser binary downloaded (CDN OK but post-download work
+    # never returned, across three different runner days).
+    # Tag tracks @playwright/test in e2e/package-lock.json (currently 1.58.2). Bump in
+    # lockstep when Playwright is upgraded.
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+
     services:
       postgres:
         image: postgres:16
@@ -173,8 +183,6 @@ jobs:
           POSTGRES_USER: bouncer
           POSTGRES_PASSWORD: bouncer
           POSTGRES_DB: bouncer_test
-        ports:
-          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -182,7 +190,9 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql://bouncer:bouncer@localhost:5432/bouncer_test
+      # Inside a job container, the service container is reachable by its service name
+      # (`postgres`) on the Docker network — not via `localhost`.
+      DATABASE_URL: postgresql://bouncer:bouncer@postgres:5432/bouncer_test
       SESSION_SECRET: ci-session-secret-minimum-sixteen-chars
       FRONTEND_URL: http://localhost:3000
       NODE_ENV: test
@@ -192,10 +202,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6.0.2
-
-      - uses: actions/setup-node@v6.3.0
-        with:
-          node-version: '24'
 
       - name: Install backend dependencies
         working-directory: backend
@@ -215,10 +221,6 @@ jobs:
 
       - name: Copy Prisma client to e2e
         run: cp -r backend/node_modules/.prisma e2e/node_modules/
-
-      - name: Install Playwright browsers
-        working-directory: e2e
-        run: npx playwright install --with-deps chromium
 
       - name: Run database migrations
         working-directory: backend
