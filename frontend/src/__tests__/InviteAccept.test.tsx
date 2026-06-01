@@ -19,13 +19,13 @@ describe('InviteAccept', () => {
   })
 
   it('shows loading spinner initially', () => {
-    vi.spyOn(global, 'fetch').mockReturnValue(new Promise(() => {}))
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}))
     const { container } = renderInviteAccept()
     expect(container.querySelector('.animate-spin')).toBeInTheDocument()
   })
 
   it('shows invalid state when token is not valid', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       json: async () => ({ valid: false, expiresAt: null }),
     } as Response)
     renderInviteAccept()
@@ -34,13 +34,13 @@ describe('InviteAccept', () => {
   })
 
   it('shows invalid state when fetch rejects', async () => {
-    vi.spyOn(global, 'fetch').mockRejectedValue(new Error('network error'))
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network error'))
     renderInviteAccept()
     await waitFor(() => expect(screen.getByText('Invitation not found')).toBeInTheDocument())
   })
 
   it('shows OAuth buttons when token is valid', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       json: async () => ({ valid: true, expiresAt: null }),
     } as Response)
     renderInviteAccept()
@@ -51,7 +51,7 @@ describe('InviteAccept', () => {
   })
 
   it('OAuth links include invite token in query string', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       json: async () => ({ valid: true, expiresAt: null }),
     } as Response)
     renderInviteAccept('tok99')
@@ -61,7 +61,7 @@ describe('InviteAccept', () => {
   })
 
   it('shows the application and role names when provided', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       json: async () => ({ valid: true, expiresAt: null, application: { name: 'My App' }, role: { name: 'Editor' } }),
     } as Response)
     renderInviteAccept()
@@ -72,7 +72,7 @@ describe('InviteAccept', () => {
 
   it('shows expiry date when provided', async () => {
     const expiresAt = new Date(Date.now() + 3600_000).toISOString()
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       json: async () => ({ valid: true, expiresAt }),
     } as Response)
     renderInviteAccept()
@@ -82,7 +82,7 @@ describe('InviteAccept', () => {
   })
 
   it('shows the Bouncer heading', async () => {
-    vi.spyOn(global, 'fetch').mockReturnValue(new Promise(() => {}))
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}))
     renderInviteAccept()
     expect(screen.getByText('Bouncer')).toBeInTheDocument()
     expect(screen.getByText("You've been invited")).toBeInTheDocument()
