@@ -104,9 +104,7 @@ export function AssignmentList() {
                         {row.user.provider}
                       </td>
                       <td className="px-4 py-4">
-                        {row.user.isGlobalAdmin
-                          ? <Badge variant="blue">Global Admin</Badge>
-                          : <Badge variant="gray">{row.role.name}</Badge>}
+                        <Badge variant="gray">{row.role.name}</Badge>
                       </td>
                       <td className="px-4 py-4">
                         <Badge variant={status.variant}>{status.label}</Badge>
