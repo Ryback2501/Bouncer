@@ -32,7 +32,7 @@ export function setupMicrosoftStrategy() {
         try {
           const email = profile.emails?.[0]?.value ?? profile._json?.mail ?? profile._json?.userPrincipalName ?? "";
           const result = await findOrCreateUser(
-            { sub: `microsoft:${profile.id}`, provider: "microsoft", name: profile.displayName, email },
+            { sub: profile.id, provider: "microsoft", name: profile.displayName, email },
             req.session.inviteToken
           );
           if (!result) return done(null, false);
