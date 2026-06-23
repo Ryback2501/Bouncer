@@ -22,7 +22,7 @@ export function setupGitHubStrategy() {
         try {
           const email = profile.emails?.[0]?.value ?? "";
           const result = await findOrCreateUser(
-            { sub: `github:${profile.id}`, provider: "github", name: profile.displayName || profile.username || email, email },
+            { sub: profile.id, provider: "github", name: profile.displayName || profile.username || email, email },
             req.session.inviteToken
           );
           if (!result) return done(null, false);

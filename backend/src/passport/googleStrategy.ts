@@ -22,7 +22,7 @@ export function setupGoogleStrategy() {
         try {
           const email = profile.emails?.[0]?.value ?? "";
           const result = await findOrCreateUser(
-            { sub: `google:${profile.id}`, provider: "google", name: profile.displayName, email },
+            { sub: profile.id, provider: "google", name: profile.displayName, email },
             req.session.inviteToken
           );
           if (!result) return done(null, false);

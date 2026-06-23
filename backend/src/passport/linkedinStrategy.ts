@@ -25,7 +25,7 @@ export function setupLinkedInStrategy() {
         try {
           const email = profile.emails?.[0]?.value ?? "";
           const result = await findOrCreateUser(
-            { sub: `linkedin:${profile.id}`, provider: "linkedin", name: profile.displayName ?? "", email },
+            { sub: profile.id, provider: "linkedin", name: profile.displayName ?? "", email },
             req.session.inviteToken
           );
           if (!result) return done(null, false as unknown as Express.User);
