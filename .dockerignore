@@ -27,7 +27,3 @@ api-specs
 docker-compose.yml
 backend/.env.docker
 backend/.env.example
-backend/Dockerfile
-backend/Dockerfile.release
-frontend/Dockerfile
-frontend/Dockerfile.release
