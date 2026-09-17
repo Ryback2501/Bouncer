@@ -1,11 +1,30 @@
 import "dotenv/config";
+import path from "path";
+import { Client } from "pg";
 import { createApp } from "./app";
 import { config } from "./config";
 import { prisma } from "./prisma";
 import { configurePassport } from "./passport";
 import logger from "./lib/logger";
+import { runMigrations } from "./lib/migrate";
+
+async function migrate() {
+  const client = new Client({ connectionString: config.DATABASE_URL });
+  await client.connect();
+  try {
+    await runMigrations({
+      client,
+      migrationsDir: path.resolve(config.MIGRATIONS_DIR),
+      logger,
+    });
+  } finally {
+    await client.end();
+  }
+}
 
 async function main() {
+  if (config.MIGRATE_ON_START) await migrate();
+
   await configurePassport();
 
   const app = createApp();

@@ -31,6 +31,14 @@ const schema = z
     // routing). The production Docker image sets this to /app/public; leave unset to keep
     // a backend-only process (the integration test app does this).
     STATIC_DIR: z.string().optional(),
+    // Apply pending prisma/migrations on startup (built-in runner, no Prisma CLI needed). On by
+    // default in every NODE_ENV: the Docker image relies on it and is often run as development/test.
+    MIGRATE_ON_START: z
+      .enum(["true", "false"])
+      .default("true")
+      .transform((v) => v === "true"),
+    // Directory holding the `<timestamp>_<name>/migration.sql` folders. Relative to the cwd.
+    MIGRATIONS_DIR: z.string().default("prisma/migrations"),
 
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
