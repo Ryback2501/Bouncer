@@ -1,5 +1,10 @@
 name: PR dev to main
 
+# Fires on the release PR from dev into main. Confirms the source is dev, that dev
+# contains all of main, runs the version gate against backend/package.json, runs CI,
+# then fast-forwards main to dev's SHA (requires the GH_PAT secret). Generalized
+# from Mockscii. The version-read step is the only stack-specific surface.
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -54,9 +59,9 @@ jobs:
       - name: Read version from backend/package.json
         id: version
         run: |
-          VERSION=$(jq -r '.version' backend/package.json)
+          VERSION=$(node -p "require('./backend/package.json').version")
           if ! printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "error: could not parse version from backend/package.json"
+            echo "error: could not parse a semver version from backend/package.json"
             exit 1
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
@@ -96,10 +101,13 @@ jobs:
     name: Fast-forward main to dev
     needs: [ci]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       # GH_PAT so the resulting push to main triggers release.yml
       # (pushes made with github.token do not trigger workflows).
-      - name: Advance main ref to dev SHA
+      - name: Advance main ref to dev SHA (requires GH_PAT)
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |

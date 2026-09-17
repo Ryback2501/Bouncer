@@ -1,5 +1,10 @@
 name: PR work to dev
 
+# Fires on PRs from a work branch into dev. Validates the branch name and that it
+# is rebased on dev, runs reusable CI, then squash-auto-merges and deletes the
+# branch. No human `gh pr merge` is ever needed. Generalized from Mockscii; the
+# only stack-specific surface is the set of required CI jobs in ci-jobs.yml.
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -17,15 +22,15 @@ jobs:
     name: Validate branch name
     runs-on: ubuntu-latest
     steps:
-      - name: Branch must match feature|fix|chore/*
+      - name: Branch must match feature|fix|chore|refactor/*
         env:
           HEAD: ${{ github.head_ref }}
         run: |
-          if printf '%s' "$HEAD" | grep -qE '^(feature|fix|chore)/.+'; then
+          if printf '%s' "$HEAD" | grep -qE '^(feature|fix|chore|refactor)/.+'; then
             echo "Branch '$HEAD' is valid."
             exit 0
           fi
-          echo "error: branch '$HEAD' must match feature/*, fix/*, or chore/*"
+          echo "error: branch '$HEAD' must match feature/*, fix/*, chore/*, or refactor/*"
           exit 1
 
   check-sync:
@@ -57,10 +62,13 @@ jobs:
     name: Squash auto-merge
     needs: [ci]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
-      # GH_PAT (not github.token): the repo's default workflow permission is
-      # read-only, so a user PAT is the robust way to merge from CI.
       - name: gh pr merge --squash --delete-branch
+        # GH_PAT (not github.token): the repo default workflow permission is read-only,
+        # so a user PAT is the robust way to merge from CI.
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |

@@ -1,16 +1,23 @@
 name: CI jobs
 
+# Reusable CI. Called by pr-work-to-dev.yml and pr-dev-to-main.yml.
+# Template workflow (Ryback2501/Template) ported to Bouncer's three-package layout:
+# `backend` + `integration` need a Postgres 16 service, `e2e` runs in the Playwright image
+# against the backend serving the built SPA, `docker` smoke-tests the compose stack, and
+# `security` is gated by the SECURITY_SCAN repo variable. Job display names are the
+# PR check names — keep them stable.
+
 on:
   workflow_call: {}
 
 permissions:
   contents: read
 
-
 jobs:
   backend:
     name: Backend (typecheck, lint, test)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     services:
       postgres:
@@ -77,6 +84,7 @@ jobs:
   frontend:
     name: Frontend (typecheck, lint, test)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v6.0.2
@@ -114,6 +122,7 @@ jobs:
   integration:
     name: Backend integration tests (real DB)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     services:
       postgres:
@@ -164,6 +173,7 @@ jobs:
   e2e:
     name: E2E tests (Playwright)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: integration
 
     # Run the job inside Microsoft's official Playwright image. Chromium and every system
@@ -256,6 +266,7 @@ jobs:
   docker:
     name: Docker stack smoke test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     # CI-safe credentials passed both to the postgres init (via compose's interpolation of
     # POSTGRES_USER/PASSWORD/DB) and built into the in-container DATABASE_URL the same way.
@@ -317,3 +328,26 @@ jobs:
       - name: Teardown
         if: always()
         run: docker compose down -v
+
+  # --- secret + dependency scan, toggled by the SECURITY_SCAN repo variable (off by
+  #     default; flip it on without editing this file). ---
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    if: vars.SECURITY_SCAN == 'true'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # Personal accounts need no license; GitHub *orgs* require GITLEAKS_LICENSE.
+      - uses: actions/setup-node@v6.3.0
+        with:
+          node-version: '24'
+      - name: Dependency vulnerability audit
+        run: |
+          for d in backend frontend e2e; do ( cd "$d" && npm ci --ignore-scripts && npm audit --audit-level=high ) || exit 1; done
