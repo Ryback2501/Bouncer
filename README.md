@@ -83,6 +83,8 @@ volumes:
 
 Start the stack: `docker compose up -d`, then open `http://localhost` and sign in via OAuth. The first sign-in matching `ADMIN_ALLOWED_EMAILS` becomes the global administrator.
 
+Database migrations are applied automatically when the container starts (the image carries its own migration runner, not the Prisma CLI, and records them in Prisma's `_prisma_migrations` table). Concurrent replicas take turns via a Postgres advisory lock. To manage migrations yourself instead, set `MIGRATE_ON_START=false`.
+
 ### From source (for development or local hacking)
 
 Clone the repo, then:

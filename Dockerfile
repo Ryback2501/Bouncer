@@ -35,16 +35,23 @@ ENV STATIC_DIR=/app/public
 WORKDIR /app
 
 COPY backend/package*.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
+# The Prisma CLI is a devDependency but also an optional peer of @prisma/client, so the lockfile
+# marks its whole tree (studio, embedded Postgres, typescript, react…) "devOptional" and
+# `--omit=dev` alone keeps it. Omitting optional too drops it (~250 MB); the only other optional
+# runtime package is pg-cloudflare, which Node never loads. Migrations run through the built-in
+# runner (src/lib/migrate.ts), so the CLI isn't needed here.
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --omit=optional \
+ && test ! -d node_modules/prisma
 
-COPY backend/prisma ./prisma
-COPY backend/prisma.config.ts ./
 # Reuse the client generated in the build stage instead of running `prisma generate` again.
 COPY --from=backend-builder /app/node_modules/.prisma ./node_modules/.prisma
+RUN node -e "require('@prisma/client'); require('@prisma/adapter-pg'); require('pg'); require('pino-pretty')"
 
+COPY backend/prisma/migrations ./prisma/migrations
 COPY --from=backend-builder /app/dist ./dist
 COPY --from=frontend-builder /app/dist ./public
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# Applies pending migrations itself on start (MIGRATE_ON_START, default true), then serves.
+CMD ["node", "dist/index.js"]
