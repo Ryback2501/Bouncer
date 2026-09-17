@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build (incrementally) and start the full Bouncer stack on Docker: postgres + backend +
-# frontend, all wired through frontend/nginx.conf's reverse proxy.
+# Build (incrementally) and start the full Bouncer stack on Docker: postgres + the single
+# Bouncer image (Express serves both the API and the built SPA on one origin).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

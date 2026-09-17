@@ -59,8 +59,9 @@ See `backend/.env.example` for the full list.
 
 ## Application security
 
-- **Headers:** `helmet` on the API (locked-down CSP, no framing); the admin SPA gets a CSP +
-  `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, and HSTS from `nginx.conf`.
+- **Headers:** `helmet` sets them for both the API and the admin SPA, which are served from the
+  same origin: a locked-down CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`,
+  and HSTS.
 - **CORS:** restricted to `FRONTEND_URL` with credentials.
 - **CSRF:** double-submit token protection on all `/admin/*` mutations.
 - **Input validation:** Zod on all request bodies/queries.
