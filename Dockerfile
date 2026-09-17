@@ -41,7 +41,15 @@ COPY backend/package*.json ./
 # runtime package is pg-cloudflare, which Node never loads. Migrations run through the built-in
 # runner (src/lib/migrate.ts), so the CLI isn't needed here.
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --omit=optional \
- && test ! -d node_modules/prisma
+ && test ! -d node_modules/prisma \
+ # @prisma/client ships WASM query compilers for five databases (~14 MB each) plus source maps;
+ # Bouncer only talks to PostgreSQL. Keep every postgresql variant, drop the rest, and fail the
+ # build if a Prisma upgrade renames the files (so this never silently prunes the wrong thing).
+ && RT=node_modules/@prisma/client/runtime \
+ && ls $RT/query_compiler_*.postgresql.* >/dev/null \
+ && find $RT -name 'query_compiler_*' ! -name '*.postgresql.*' -delete \
+ && find $RT -name '*.map' -delete \
+ && ! ls $RT/query_compiler_* | grep -v '\.postgresql\.'
 
 # Reuse the client generated in the build stage instead of running `prisma generate` again.
 COPY --from=backend-builder /app/node_modules/.prisma ./node_modules/.prisma
