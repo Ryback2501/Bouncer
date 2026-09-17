@@ -1,5 +1,9 @@
 name: Deploy (dev)
 
+# Fires on every push to dev. A gated hook for publishing a dev/preview environment
+# once one is wired up. Off by default (DEV_DEPLOY_ENABLED repo variable). Generalized
+# from Mockscii — replace the placeholder step with the real preview deploy when ready.
+
 on:
   push:
     branches: [dev]
@@ -13,15 +17,16 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy to dev environment (gated)
+    name: Deploy preview (dev, gated)
     runs-on: ubuntu-latest
-    if: vars.DEPLOY_ENABLED == 'true'
+    if: vars.DEV_DEPLOY_ENABLED == 'true'
     steps:
-      - run: 'echo "TODO: build/push images and deploy the dev environment"'
+      - uses: actions/checkout@v6.0.2
+      - run: 'echo "TODO: publish a dev preview of the built output when a dev environment is wired up."'
 
   deploy-disabled:
-    name: Deploy to dev environment (gated — DISABLED)
+    name: Deploy preview (dev, gated — DISABLED)
     runs-on: ubuntu-latest
-    if: vars.DEPLOY_ENABLED != 'true'
+    if: vars.DEV_DEPLOY_ENABLED != 'true'
     steps:
-      - run: echo "DEPLOY_ENABLED repo variable is not 'true' — dev deploy skipped (gated placeholder)."
+      - run: echo "DEV_DEPLOY_ENABLED repo variable is not 'true' — dev deploy skipped."
