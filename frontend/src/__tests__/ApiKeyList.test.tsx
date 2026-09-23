@@ -88,4 +88,27 @@ describe('ApiKeyList', () => {
     renderWithProviders(<ApiKeyList />, { route: '/applications/app1/api-keys', path: '/applications/:appId/api-keys' })
     await waitFor(() => expect(screen.getByText('My App')).toBeInTheDocument())
   })
+
+  // A key for the portal's own application would grant its holder administrator access, so the
+  // server refuses to create one. The UI must not offer it — but must still list and revoke keys
+  // left over from an earlier version.
+  describe('for the Bouncer portal application', () => {
+    const bouncerApp = { ...mockApp, name: 'Bouncer', customId: 'bouncer' }
+
+    it('offers no way to generate a key', async () => {
+      vi.mocked(getApplication).mockResolvedValue(bouncerApp)
+      vi.mocked(getApiKeys).mockResolvedValue([])
+      renderWithProviders(<ApiKeyList />, { route: '/applications/app1/api-keys', path: '/applications/:appId/api-keys' })
+      await waitFor(() => expect(screen.getByText(/cannot be issued API keys/i)).toBeInTheDocument())
+      expect(screen.queryByRole('button', { name: /Generate Key/i })).not.toBeInTheDocument()
+    })
+
+    it('still lists existing keys so they can be revoked', async () => {
+      vi.mocked(getApplication).mockResolvedValue(bouncerApp)
+      vi.mocked(getApiKeys).mockResolvedValue([mockKey])
+      renderWithProviders(<ApiKeyList />, { route: '/applications/app1/api-keys', path: '/applications/:appId/api-keys' })
+      await waitFor(() => expect(screen.getByText('production')).toBeInTheDocument())
+      expect(screen.getByRole('button', { name: /Revoke/i })).toBeInTheDocument()
+    })
+  })
 })

@@ -35,8 +35,21 @@ export function ApiKeyList() {
       setNewLabel('')
       setGeneratedKey(data)
     },
-    onError: () => toast.error('Failed to generate API key'),
+    onError: (err: { response?: { status?: number; data?: { error?: string } } }) => {
+      // Only a policy 403 puts readable prose in `error`; everything else puts a machine code
+      // there (internal_error, validation_error), which is no use to an operator.
+      const policyMessage = err.response?.status === 403 ? err.response.data?.error : undefined
+      toast.error(policyMessage ?? 'Failed to generate API key')
+    },
   })
+
+  // The admin portal is itself an application, and its `admin` role is what grants a portal
+  // session — a key issued for it would be a route to global admin, so the server refuses to
+  // create one. Existing keys stay listed and revocable here.
+  const isPortalApp = app?.customId === 'bouncer'
+  // Until the application has loaded we cannot tell, so withhold the button rather than offer one
+  // that can only fail. The server guard is the real control either way.
+  const canGenerate = app !== undefined && !isPortalApp
 
   const deleteMutation = useDeleteMutation<ApiKey>({
     mutationFn: (key) => deleteApiKey(appId!, key.id),
@@ -59,9 +72,18 @@ export function ApiKeyList() {
         <span className="text-sm font-medium text-gray-700">API Keys</span>
       </div>
 
+      {isPortalApp && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          The Bouncer application cannot be issued API keys — one would grant its holder
+          administrator access. Any key listed here is from an earlier version and should be revoked.
+        </p>
+      )}
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">{keys.length} key{keys.length !== 1 ? 's' : ''}</p>
-        <Button onClick={() => setNewKeyOpen(true)}><Plus size={16} />Generate Key</Button>
+        {canGenerate && (
+          <Button onClick={() => setNewKeyOpen(true)}><Plus size={16} />Generate Key</Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -70,8 +92,16 @@ export function ApiKeyList() {
         <EmptyState
           icon={Key}
           title="No API keys"
-          description="Generate an API key to allow your application to query Bouncer."
-          action={<Button onClick={() => setNewKeyOpen(true)}><Plus size={16} />Generate Key</Button>}
+          description={
+            isPortalApp
+              ? 'The Bouncer application does not use API keys.'
+              : 'Generate an API key to allow your application to query Bouncer.'
+          }
+          action={
+            canGenerate ? (
+              <Button onClick={() => setNewKeyOpen(true)}><Plus size={16} />Generate Key</Button>
+            ) : undefined
+          }
         />
       ) : (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">

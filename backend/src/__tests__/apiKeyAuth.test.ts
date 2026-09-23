@@ -106,4 +106,32 @@ describe('apiKeyAuth', () => {
     expect(req.bouncerApp).toEqual(mockApp)
     expect(next).toHaveBeenCalledOnce()
   })
+
+  // The admin portal is itself an Application row, and holding its `admin` role is what grants a
+  // portal session. A key issued for it could therefore mint global-admin invitations via
+  // POST /api/v1/invitations, and probe admin membership via GET /api/v1/access. The portal is not
+  // an API consumer: reject its keys here, which covers every /api/v1 route at once.
+  it('returns 403 for a key belonging to the Bouncer portal application', async () => {
+    const rawKey = 'bncr_portalkey'
+    const keyHash = createHash('sha256').update(rawKey).digest('hex')
+    p.findUnique.mockResolvedValue({
+      id: 'k1', keyHash, expiresAt: null,
+      application: { id: 'bouncer-app-id', name: 'Bouncer', customId: 'bouncer' },
+    })
+    p.update.mockResolvedValue({})
+
+    const req = makeReq(`Bearer ${rawKey}`)
+    const res = makeRes()
+    const next = vi.fn() as unknown as NextFunction
+
+    await apiKeyAuth(req, res, next)
+
+    expect((res.status as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(403)
+    expect((res.json as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith({ error: 'api_key_not_permitted' })
+    expect(next).not.toHaveBeenCalled()
+    expect(req.bouncerApp).toBeUndefined()
+    // lastUsedAt is still bumped on purpose: it is how an operator sees in the admin UI that such
+    // a key is live and needs revoking, rather than having to read the server log.
+    expect(p.update).toHaveBeenCalledWith({ where: { id: 'k1' }, data: { lastUsedAt: expect.any(Date) } })
+  })
 })

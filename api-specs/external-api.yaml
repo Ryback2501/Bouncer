@@ -219,7 +219,10 @@ paths:
               example:
                 error: invalid_api_key
         '403':
-          description: User's role is inactive or expired
+          description: >-
+            User's role is inactive or expired (`role_inactive`), or the key is scoped to the
+            Bouncer admin portal's own application, which is not an API consumer
+            (`api_key_not_permitted`).
           content:
             application/json:
               schema:
@@ -289,6 +292,16 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: invalid_api_key
+        '403':
+          description: >-
+            The key is scoped to the Bouncer admin portal's own application, which is not an API
+            consumer — it owns the role that grants administrator access.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: api_key_not_permitted
         '404':
           description: Role not found in this application
           content:
