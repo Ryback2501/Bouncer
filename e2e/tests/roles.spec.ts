@@ -20,7 +20,15 @@ test.describe('Roles', () => {
     // Open the New Role form. RoleList renders the "New Role" button in both the
     // header AND the empty-state action when the app has no roles yet — `.first()`
     // disambiguates without coupling to which one renders.
-    await page.getByRole('button', { name: /New Role/i }).first().click()
+    //
+    // The header button is rendered while the roles query is still loading, so it is
+    // clickable before React has attached its onClick and the click is then silently
+    // dropped, leaving the modal shut. Retry until the modal's heading actually appears
+    // (the <h2> in Modal, distinct from the button of the same name).
+    await expect(async () => {
+      await page.getByRole('button', { name: /New Role/i }).first().click()
+      await expect(page.getByRole('heading', { name: 'New Role' })).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 15_000 })
 
     // Fill in the form
     await page.getByLabel('Name').fill(ROLE_NAME)
