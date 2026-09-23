@@ -67,6 +67,16 @@ See `backend/.env.example` for the full list.
   and HSTS.
 - **CORS:** restricted to `FRONTEND_URL` with credentials.
 - **CSRF:** double-submit token protection on all `/admin/*` mutations.
+- **OAuth flow integrity:** every provider sends and verifies a single-use `state` parameter
+  (anti login-CSRF, RFC 6749 §10.12); Google/Microsoft/GitHub additionally use a PKCE `S256`
+  challenge. LinkedIn (OIDC) deliberately requests **no** `nonce` — it does not echo one back in
+  the ID token, and passport-openidconnect fails a login whose requested nonce is missing. State
+  and the PKCE verifier are held in the session, so the session cookie must reach the callback:
+  keep it `sameSite=lax`. `strict` would drop it on the provider's redirect back and break
+  sign-in entirely.
+- **One flow at a time per browser session:** the state slot is per provider and single-use, so
+  starting a second sign-in in another tab invalidates the first. The stale tab lands on
+  `/login?error=auth_failed`.
 - **Input validation:** Zod on all request bodies/queries.
 - **Logging:** `Authorization`, `Cookie`, and `Set-Cookie` are redacted; internal error messages are
   never returned to clients in production.

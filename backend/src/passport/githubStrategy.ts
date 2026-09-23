@@ -16,7 +16,15 @@ export function setupGitHubStrategy() {
         clientSecret: config.GITHUB_CLIENT_SECRET,
         callbackURL: config.GITHUB_CALLBACK_URL ?? "/auth/github/callback",
         scope: ["user:email"],
+        // See googleStrategy for why these are set. GitHub supports PKCE with S256.
+        pkce: true,
         passReqToCallback: true,
+        // @types/passport-github2 narrows the inherited `state` option to `string`, but
+        // passport-oauth2 only tests it for truthiness when choosing the state store. Spread a
+        // narrowly-cast object so the rest of this literal stays type-checked. Passing the
+        // string "true" would also compile, but a *string* state at authenticate() time bypasses
+        // the store entirely, so it is the wrong habit to establish.
+        ...({ state: true } as unknown as { state?: string }),
       },
       async (req: Request, _accessToken: string, _refreshToken: string, profile: Profile, done: VerifyDone) => {
         try {

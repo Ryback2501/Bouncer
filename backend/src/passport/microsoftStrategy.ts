@@ -26,6 +26,10 @@ export function setupMicrosoftStrategy() {
         callbackURL: config.MICROSOFT_CALLBACK_URL ?? "/auth/microsoft/callback",
         tenant: config.MICROSOFT_TENANT_ID,
         scope: ["user.read"],
+        // See googleStrategy for why these are set. passport-microsoft is a thin wrapper that
+        // forwards its options straight to passport-oauth2, so both take effect here.
+        state: true,
+        pkce: true,
         passReqToCallback: true,
       },
       async (req: Request, _accessToken: string, _refreshToken: string, profile: MicrosoftProfile, done: VerifyDone) => {
