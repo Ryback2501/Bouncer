@@ -19,6 +19,8 @@ let editorRoleId: string
 let app2Id: string
 let rawApiKey: string
 let adminInviteId: string | null = null
+// A key against the *real* Bouncer application, so it is not covered by the PREFIX cascade.
+let bouncerKeyId: string | null = null
 
 const hash = (raw: string) => createHash('sha256').update(raw).digest('hex')
 
@@ -73,6 +75,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  if (bouncerKeyId) await prisma.apiKey.deleteMany({ where: { id: bouncerKeyId } })
   if (adminInviteId) await prisma.invitation.deleteMany({ where: { id: adminInviteId } })
   await prisma.user.deleteMany({ where: { sub: { startsWith: PREFIX } } })
   // App deletion cascades roles, apiKeys, userRoles, and invitations for these apps.
@@ -95,6 +98,49 @@ describe('POST /api/v1/invitations (mint)', () => {
     expect(created[0].roleId).toBe(editorRoleId)
     expect(created[0].redirectUri).toBe('https://app.example.com/welcome')
     expect(created[0].createdById).toBeNull()
+  })
+
+  // B-03. The admin portal is itself an Application holding the `admin` role that grants a portal
+  // session, so a key issued for it used to mint a genuine global-admin invitation here (verified
+  // during the audit: 201, invitation targeting bouncer/admin). The portal is not an API consumer —
+  // its keys must be rejected across /api/v1 entirely.
+  describe('a key belonging to the Bouncer application itself', () => {
+    let bouncerRawKey: string
+
+    beforeAll(async () => {
+      const { app: bouncerApp } = await ensureBouncerDefaults()
+      bouncerRawKey = `bncr_${randomBytes(32).toString('hex')}`
+      const row = await prisma.apiKey.create({
+        data: { applicationId: bouncerApp.id, keyHash: hash(bouncerRawKey), label: 'int-b03' },
+      })
+      bouncerKeyId = row.id
+    })
+
+    it('cannot mint a global-admin invitation', async () => {
+      const { app: bouncerApp } = await ensureBouncerDefaults()
+      const before = await prisma.invitation.count({ where: { applicationId: bouncerApp.id } })
+
+      const res = await request(app)
+        .post('/api/v1/invitations')
+        .set('Authorization', `Bearer ${bouncerRawKey}`)
+        .send({ role: 'admin' })
+
+      expect(res.status).toBe(403)
+      expect(res.body.error).toBe('api_key_not_permitted')
+
+      const after = await prisma.invitation.count({ where: { applicationId: bouncerApp.id } })
+      expect(after).toBe(before)
+    })
+
+    it('cannot probe admin membership via /api/v1/access', async () => {
+      const res = await request(app)
+        .get('/api/v1/access')
+        .query({ sub: 'anything', provider: 'google' })
+        .set('Authorization', `Bearer ${bouncerRawKey}`)
+
+      expect(res.status).toBe(403)
+      expect(res.body.error).toBe('api_key_not_permitted')
+    })
   })
 
   it('rejects a redirectUri whose origin is not in the app allowlist (400)', async () => {

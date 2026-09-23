@@ -8,10 +8,24 @@ vi.mock('../services/apiKeyService', () => ({
   deleteApiKey: vi.fn(),
 }))
 
+vi.mock('../lib/bouncerDefaults', () => ({
+  ensureBouncerDefaults: vi.fn(),
+}))
+
+import type { Application, Role } from '@prisma/client'
 import * as svc from '../services/apiKeyService'
+import { ensureBouncerDefaults } from '../lib/bouncerDefaults'
 import router from '../routes/admin/apiKeys'
 
 const mockKey = { id: 'k1', label: 'prod', lastUsedAt: null, createdAt: new Date().toISOString() }
+const BOUNCER_ID = 'bouncer-app-id'
+
+function mockDefaults() {
+  vi.mocked(ensureBouncerDefaults).mockResolvedValue({
+    app: { id: BOUNCER_ID } as unknown as Application,
+    role: {} as unknown as Role,
+  })
+}
 
 function makeApp() {
   const app = express()
@@ -34,7 +48,7 @@ describe('GET /applications/:appId/api-keys', () => {
 })
 
 describe('POST /applications/:appId/api-keys', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => { vi.clearAllMocks(); mockDefaults() })
 
   it('creates api key and returns 201 with rawKey', async () => {
     const newKey = { ...mockKey, rawKey: 'bncr_abc123' }
@@ -54,6 +68,32 @@ describe('POST /applications/:appId/api-keys', () => {
   it('returns 400 when label is an empty string', async () => {
     const res = await request(makeApp()).post('/app1/api-keys').send({ label: '' })
     expect(res.status).toBe(400)
+  })
+
+  // A key for the portal's own Application would be able to mint global-admin invitations, so
+  // refuse to issue one at all — mirroring the guards on modifying/deleting that application.
+  it('returns 403 when issuing a key for the Bouncer application', async () => {
+    const res = await request(makeApp()).post(`/${BOUNCER_ID}/api-keys`).send({ label: 'nope' })
+    expect(res.status).toBe(403)
+    expect(svc.createApiKey).not.toHaveBeenCalled()
+  })
+})
+
+// Listing and revoking stay reachable for the Bouncer application: an operator upgrading from a
+// version that allowed such a key must still be able to see and delete it.
+describe('Bouncer application keys remain listable and revocable', () => {
+  beforeEach(() => { vi.clearAllMocks(); mockDefaults() })
+
+  it('GET still returns 200 for the Bouncer application', async () => {
+    vi.mocked(svc.listApiKeys).mockResolvedValue([mockKey] as unknown as Awaited<ReturnType<typeof svc.listApiKeys>>)
+    const res = await request(makeApp()).get(`/${BOUNCER_ID}/api-keys`)
+    expect(res.status).toBe(200)
+  })
+
+  it('DELETE still returns 204 for the Bouncer application', async () => {
+    vi.mocked(svc.deleteApiKey).mockResolvedValue({} as unknown as Awaited<ReturnType<typeof svc.deleteApiKey>>)
+    const res = await request(makeApp()).delete(`/${BOUNCER_ID}/api-keys/k1`)
+    expect(res.status).toBe(204)
   })
 })
 

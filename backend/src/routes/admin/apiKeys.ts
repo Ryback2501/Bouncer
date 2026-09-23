@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import * as svc from "../../services/apiKeyService";
+import { ensureBouncerDefaults } from "../../lib/bouncerDefaults";
 import { handlePrismaError } from "../../lib/prismaErrors";
 import { validateBody } from "../../middleware/validate";
 import { asyncHandler } from "../../lib/asyncHandler";
@@ -16,7 +17,16 @@ router.get("/", asyncHandler(async (req: Request, res: Response) => {
   res.json(await svc.listApiKeys(req.params.appId));
 }));
 
+// Issuing a key for the Bouncer application itself would hand its holder a route to global admin
+// (it owns the `admin` role), so refuse — matching the guards on modifying and deleting that
+// application. Listing and revoking below stay open, so a key from an older deployment can still
+// be found and removed; apiKeyAuth rejects it at use in the meantime.
 router.post("/", validateBody(createApiKeySchema), asyncHandler(async (req: Request, res: Response) => {
+  const { app } = await ensureBouncerDefaults();
+  if (req.params.appId === app.id) {
+    res.status(403).json({ error: "The Bouncer application cannot be issued API keys" });
+    return;
+  }
   const { label, expiresAt } = req.body as z.infer<typeof createApiKeySchema>;
   const result = await svc.createApiKey(req.params.appId, {
     label,

@@ -59,6 +59,11 @@ See `backend/.env.example` for the full list.
 - **Per-API-key rate limiting** on `/api/v1/*` (default 300 req/min/key) bounds the blast radius of a
   leaked key.
 - **Rotation:** create a new key, switch the app over, then delete the old one.
+- **The Bouncer application cannot be issued a key.** The admin portal is modelled as an application
+  of its own, and it owns the `admin` role that grants a portal session — so a key scoped to it could
+  mint global-admin invitations and probe who holds admin. Creating one is refused (`403`), and any
+  key that already exists is rejected across the whole of `/api/v1` (`403 api_key_not_permitted`) and
+  logged as a warning. Such a key remains visible in the admin UI so it can be revoked.
 
 ## Application security
 
