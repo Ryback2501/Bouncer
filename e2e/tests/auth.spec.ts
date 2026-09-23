@@ -33,3 +33,12 @@ test.describe('Invite accept page', () => {
     await expect(page.getByText(/invalid|expired/i)).toBeVisible()
   })
 })
+
+test.describe('Authentication bypasses', () => {
+  // Runs against the built backend started with NODE_ENV=test — the exact condition under
+  // which a test-only login route would be live. OAuth must be the only way in.
+  test('there is no credential-free login route', async ({ request }) => {
+    const res = await request.post('/auth/test-login')
+    expect(res.status()).toBe(404)
+  })
+})

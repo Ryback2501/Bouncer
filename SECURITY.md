@@ -11,6 +11,9 @@ built-in protections and what an operator must do to deploy it safely.
 - **Admins** authenticate to the portal via OAuth (Google/Microsoft/GitHub/OpenID). Only users
   holding the active Bouncer **admin** role get a session; everyone else is rejected.
 - **End users** never authenticate to Bouncer directly except to accept an invitation.
+- **There is no test, debug, or bypass login route** in any build, and no value of `NODE_ENV`
+  unlocks one — OAuth is the only way to obtain a portal session. The e2e suite seeds a session
+  row directly against its own database instead of asking the server for one.
 
 ## Required production configuration (fails closed)
 

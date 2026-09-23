@@ -33,4 +33,16 @@ describe('Authentication guards', () => {
     const res = await request(app).get('/auth/logout')
     expect(res.status).toBe(404)
   })
+
+  // Regression guard: there must be no test-only login bypass. This suite runs with
+  // NODE_ENV=test (see __tests__/setup.ts), which is exactly the condition that used to
+  // register the route, so a reappearance fails here.
+  it('POST /auth/test-login does not exist in any environment', async () => {
+    const res = await request(app).post('/auth/test-login')
+    expect(res.status).toBe(404)
+    // Status alone is not enough: the removed route also answered 404 when no global admin
+    // existed, but with a JSON body. An unmatched Express route yields the default HTML 404,
+    // which supertest surfaces as an empty body.
+    expect(res.body).not.toHaveProperty('error')
+  })
 })
