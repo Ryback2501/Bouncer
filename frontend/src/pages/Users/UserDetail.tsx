@@ -115,15 +115,18 @@ export function UserDetail() {
                       {ur.expiredAt ? new Date(ur.expiredAt).toLocaleDateString() : '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => { setEditingRole(ur); setAssignOpen(true) }}>
-                          Edit
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setRemovingRole(ur)}
-                          className="text-red-500 hover:bg-red-50 hover:text-red-700">
-                          <Trash2 size={14} />
-                        </Button>
-                      </div>
+                      {/* The global admin's portal role cannot be changed or removed (the API refuses). */}
+                      {!(user.isGlobalAdmin && ur.application.customId === 'bouncer') && (
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => { setEditingRole(ur); setAssignOpen(true) }}>
+                            Edit
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setRemovingRole(ur)}
+                            className="text-red-500 hover:bg-red-50 hover:text-red-700">
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

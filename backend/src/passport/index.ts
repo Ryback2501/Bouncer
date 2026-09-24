@@ -127,10 +127,13 @@ export async function findOrCreateUser(
   }
 
   // ── No invite, no user: bootstrap the very first user as global admin ────────
-  const adminCount = await prisma.userRole.count({
-    where: { applicationId: bouncerApp.id, roleId: adminRole.id },
-  });
-  if (adminCount === 0) {
+  // A one-time latch, not a count of current admin assignments. Assignments can drop back to zero
+  // (the last admin's portal role removed), and a count would then hand global admin to whoever
+  // signs in next. `isGlobalAdmin` is set only here and the API cannot delete that user or clear
+  // the flag, so once it exists the bootstrap never re-opens. It also reads no cached ids, which
+  // match nothing after a database reset under a running process.
+  const bootstrapped = await prisma.user.count({ where: { isGlobalAdmin: true } });
+  if (bootstrapped === 0) {
     // Bootstrap guard: only allowlisted emails may become the first global admin. This closes
     // the "first person to reach OAuth wins global admin" race. (Required in production via config.)
     const allowlist = config.ADMIN_ALLOWED_EMAILS;

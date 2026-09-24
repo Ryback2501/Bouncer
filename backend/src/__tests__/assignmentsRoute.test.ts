@@ -8,10 +8,28 @@ vi.mock('../services/assignmentService', () => ({
   removeRole: vi.fn(),
 }))
 
+vi.mock('../prisma', () => ({
+  prisma: { user: { findUnique: vi.fn() } },
+}))
+
+vi.mock('../lib/bouncerDefaults', () => ({
+  isBouncerApplication: vi.fn(),
+}))
+
 import * as svc from '../services/assignmentService'
+import { prisma } from '../prisma'
+import { isBouncerApplication } from '../lib/bouncerDefaults'
 import router from '../routes/admin/assignments'
 
 const mockUserRole = { id: 'ur1', userId: 'u1', applicationId: 'app1', roleId: 'r1', active: true, expiredAt: null }
+
+const findUser = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>
+
+// By default the target is an ordinary user and the app an ordinary application.
+function asOrdinary() {
+  findUser.mockResolvedValue({ isGlobalAdmin: false })
+  vi.mocked(isBouncerApplication).mockResolvedValue(false)
+}
 
 function makeApp() {
   const app = express()
@@ -23,7 +41,7 @@ function makeApp() {
 }
 
 describe('GET /users/:userId/roles', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => { vi.clearAllMocks(); asOrdinary() })
 
   it('returns user role assignments', async () => {
     vi.mocked(svc.getUserRoles).mockResolvedValue([mockUserRole] as unknown as Awaited<ReturnType<typeof svc.getUserRoles>>)
@@ -34,7 +52,7 @@ describe('GET /users/:userId/roles', () => {
 })
 
 describe('PUT /users/:userId/roles/:appId', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => { vi.clearAllMocks(); asOrdinary() })
 
   it('assigns a role and returns the assignment', async () => {
     vi.mocked(svc.assignRole).mockResolvedValue(mockUserRole as unknown as Awaited<ReturnType<typeof svc.assignRole>>)
@@ -83,7 +101,7 @@ describe('PUT /users/:userId/roles/:appId', () => {
 })
 
 describe('DELETE /users/:userId/roles/:appId', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => { vi.clearAllMocks(); asOrdinary() })
 
   it('returns 204 on successful removal', async () => {
     vi.mocked(svc.removeRole).mockResolvedValue({} as unknown as Awaited<ReturnType<typeof svc.removeRole>>)
@@ -95,5 +113,42 @@ describe('DELETE /users/:userId/roles/:appId', () => {
     vi.mocked(svc.removeRole).mockRejectedValue({ code: 'P2025' })
     const res = await request(makeApp()).delete('/u1/roles/app1')
     expect(res.status).toBe(404)
+  })
+})
+
+// B-05. The global admin's portal role is what keeps the first-user bootstrap from mattering: strip
+// it and the portal is locked out (or, before the bootstrap latch, re-armed for the next sign-in).
+// Same rule users.ts applies to the global admin's user record.
+describe("the global admin's portal role", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    findUser.mockResolvedValue({ isGlobalAdmin: true })
+    vi.mocked(isBouncerApplication).mockResolvedValue(true)
+  })
+
+  it('cannot be changed (403)', async () => {
+    const res = await request(makeApp()).put('/u1/roles/bouncer-app').send({ roleId: 'r1', active: false })
+    expect(res.status).toBe(403)
+    expect(svc.assignRole).not.toHaveBeenCalled()
+  })
+
+  it('cannot be removed (403)', async () => {
+    const res = await request(makeApp()).delete('/u1/roles/bouncer-app')
+    expect(res.status).toBe(403)
+    expect(svc.removeRole).not.toHaveBeenCalled()
+  })
+
+  it("leaves the global admin's roles in other applications manageable", async () => {
+    vi.mocked(isBouncerApplication).mockResolvedValue(false)
+    vi.mocked(svc.removeRole).mockResolvedValue({} as unknown as Awaited<ReturnType<typeof svc.removeRole>>)
+    const res = await request(makeApp()).delete('/u1/roles/app1')
+    expect(res.status).toBe(204)
+  })
+
+  it("leaves other admins' portal roles manageable", async () => {
+    findUser.mockResolvedValue({ isGlobalAdmin: false })
+    vi.mocked(svc.removeRole).mockResolvedValue({} as unknown as Awaited<ReturnType<typeof svc.removeRole>>)
+    const res = await request(makeApp()).delete('/u2/roles/bouncer-app')
+    expect(res.status).toBe(204)
   })
 })

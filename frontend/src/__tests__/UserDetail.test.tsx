@@ -104,6 +104,24 @@ describe('UserDetail', () => {
     await waitFor(() => expect(screen.getByText('Remove Role')).toBeInTheDocument())
   })
 
+  // B-05. The backend refuses to change or remove the global admin's portal role, so its row offers
+  // neither action; the global admin's roles in other applications keep both.
+  it("hides Edit and Remove on the global admin's portal role only", async () => {
+    const portalRole = {
+      ...mockUserRole,
+      id: 'ur-portal',
+      applicationId: 'bouncer-app',
+      roleId: 'admin-role',
+      application: { ...mockUserRole.application, id: 'bouncer-app', name: 'Bouncer', customId: 'bouncer' },
+      role: { ...mockUserRole.role, id: 'admin-role', name: 'Admin', customId: 'admin', applicationId: 'bouncer-app' },
+    }
+    vi.mocked(getUser).mockResolvedValue({ ...mockUser, isGlobalAdmin: true, userRoles: [portalRole, mockUserRole] })
+    const { container } = renderWithProviders(<UserDetail />, { route: '/users/u1', path: '/users/:userId' })
+    await waitFor(() => screen.getByText('Editor'))
+    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(1)
+    expect(container.querySelectorAll('button.text-red-500')).toHaveLength(1)
+  })
+
   it('shows Active badge for an active role with no expiry', async () => {
     vi.mocked(getUser).mockResolvedValue(mockUser) // active: true, expiredAt: null
     renderWithProviders(<UserDetail />, { route: '/users/u1', path: '/users/:userId' })
