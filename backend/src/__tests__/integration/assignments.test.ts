@@ -8,6 +8,7 @@ import request from 'supertest'
 import { createHash, randomBytes } from 'crypto'
 import { prisma } from '../../prisma'
 import { makeTestApp } from './testApp'
+import { ensureBouncerDefaults } from '../../lib/bouncerDefaults'
 
 const app = makeTestApp()
 
@@ -182,5 +183,49 @@ describe('GET /admin/assignments (cross-app listing)', () => {
       expect(row).toHaveProperty('application.id')
       expect(row).toHaveProperty('application.customId')
     }
+  })
+})
+
+// B-05. The global admin's portal role cannot be changed or removed through the API; stripping it
+// would lock the portal out of its only guaranteed admin.
+describe("the global admin's portal role — integration", () => {
+  let globalAdminId: string
+  let bouncerAppId: string
+  let adminRoleId: string
+
+  beforeAll(async () => {
+    const { app: bouncerApp, role: adminRole } = await ensureBouncerDefaults()
+    bouncerAppId = bouncerApp.id
+    adminRoleId = adminRole.id
+    globalAdminId = (await prisma.user.create({
+      data: { name: 'Global Admin', sub: `${PREFIX}-global`, provider: 'google', isGlobalAdmin: true },
+    })).id
+    await prisma.userRole.create({
+      data: { userId: globalAdminId, applicationId: bouncerAppId, roleId: adminRoleId, active: true },
+    })
+  })
+
+  afterAll(async () => {
+    await prisma.user.deleteMany({ where: { id: globalAdminId } }) // cascades the assignment
+  })
+
+  it('DELETE returns 403 and the assignment survives', async () => {
+    const res = await request(app).delete(`/admin/users/${globalAdminId}/roles/${bouncerAppId}`)
+    expect(res.status).toBe(403)
+    const row = await prisma.userRole.findUnique({
+      where: { userId_applicationId: { userId: globalAdminId, applicationId: bouncerAppId } },
+    })
+    expect(row).not.toBeNull()
+  })
+
+  it('PUT (deactivate) returns 403 and the assignment is unchanged', async () => {
+    const res = await request(app)
+      .put(`/admin/users/${globalAdminId}/roles/${bouncerAppId}`)
+      .send({ roleId: adminRoleId, active: false })
+    expect(res.status).toBe(403)
+    const row = await prisma.userRole.findUnique({
+      where: { userId_applicationId: { userId: globalAdminId, applicationId: bouncerAppId } },
+    })
+    expect(row?.active).toBe(true)
   })
 })

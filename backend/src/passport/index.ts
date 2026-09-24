@@ -5,7 +5,7 @@ import { setupGoogleStrategy } from "./googleStrategy";
 import { setupMicrosoftStrategy } from "./microsoftStrategy";
 import { setupGitHubStrategy } from "./githubStrategy";
 import { setupLinkedInStrategy } from "./linkedinStrategy";
-import { ensureBouncerDefaults } from "../lib/bouncerDefaults";
+import { ensureBouncerDefaults, BOUNCER_APP_CUSTOM_ID, BOUNCER_ADMIN_ROLE_CUSTOM_ID } from "../lib/bouncerDefaults";
 import { config } from "../config";
 
 export async function configurePassport() {
@@ -66,7 +66,7 @@ export async function findOrCreateUser(
       const tokenHash = createHash("sha256").update(inviteToken).digest("hex");
       const invitation = await tx.invitation.findFirst({
         where: { token: tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
-        include: { application: { select: { customId: true } } },
+        include: { application: { select: { customId: true } }, role: { select: { customId: true } } },
       });
       if (!invitation) return null;
 
@@ -82,26 +82,47 @@ export async function findOrCreateUser(
         },
       });
 
+      const toPortal = invitation.application.customId === BOUNCER_APP_CUSTOM_ID;
+      const isAdminInvite = toPortal && invitation.role.customId === BOUNCER_ADMIN_ROLE_CUSTOM_ID;
+      // The global admin's portal role is never replaced by an invite: any admin can add a second
+      // role to the Bouncer app and invite them to it, and since the bootstrap no longer re-opens,
+      // losing that role would lock the portal out for good. The invite is still consumed.
+      const keepsPortalAdmin = user.isGlobalAdmin && toPortal && !isAdminInvite;
+
       // Same upsert as assignmentService.assignRole, but on the transaction client.
-      await tx.userRole.upsert({
-        where: { userId_applicationId: { userId: user.id, applicationId: invitation.applicationId } },
-        update: { roleId: invitation.roleId, active: true, expiredAt: null },
-        create: {
-          userId: user.id,
-          applicationId: invitation.applicationId,
-          roleId: invitation.roleId,
-          active: true,
-        },
-      });
+      if (!keepsPortalAdmin) {
+        await tx.userRole.upsert({
+          where: { userId_applicationId: { userId: user.id, applicationId: invitation.applicationId } },
+          update: { roleId: invitation.roleId, active: true, expiredAt: null },
+          create: {
+            userId: user.id,
+            applicationId: invitation.applicationId,
+            roleId: invitation.roleId,
+            active: true,
+          },
+        });
+      }
 
       await tx.invitation.update({ where: { id: invitation.id }, data: { usedAt: new Date() } });
 
-      const isAdminInvite =
-        invitation.applicationId === bouncerApp.id && invitation.roleId === adminRole.id;
+      // A kept portal role only earns a portal session if it is usable: the per-request session check
+      // would otherwise reject an inactive or expired one straight after the redirect.
+      const keptRoleUsable =
+        keepsPortalAdmin &&
+        (await tx.userRole.count({
+          where: {
+            userId: user.id,
+            active: true,
+            OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }],
+            application: { customId: BOUNCER_APP_CUSTOM_ID },
+            role: { customId: BOUNCER_ADMIN_ROLE_CUSTOM_ID },
+          },
+        })) > 0;
+
       return {
         user,
         outcome: {
-          kind: isAdminInvite ? "admin" : "app",
+          kind: isAdminInvite || keptRoleUsable ? "admin" : "app",
           redirectUri: invitation.redirectUri,
           appCustomId: invitation.application.customId,
         },
@@ -127,10 +148,13 @@ export async function findOrCreateUser(
   }
 
   // ── No invite, no user: bootstrap the very first user as global admin ────────
-  const adminCount = await prisma.userRole.count({
-    where: { applicationId: bouncerApp.id, roleId: adminRole.id },
-  });
-  if (adminCount === 0) {
+  // A one-time latch, not a count of current admin assignments. Assignments can drop back to zero
+  // (the last admin's portal role removed), and a count would then hand global admin to whoever
+  // signs in next. `isGlobalAdmin` is set only here and the API cannot delete that user or clear
+  // the flag, so once it exists the bootstrap never re-opens. The check itself reads no cached ids,
+  // so a database reset under a running process cannot open it either.
+  const bootstrapped = await prisma.user.count({ where: { isGlobalAdmin: true } });
+  if (bootstrapped === 0) {
     // Bootstrap guard: only allowlisted emails may become the first global admin. This closes
     // the "first person to reach OAuth wins global admin" race. (Required in production via config.)
     const allowlist = config.ADMIN_ALLOWED_EMAILS;

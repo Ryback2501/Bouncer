@@ -98,35 +98,45 @@ export function UserDetail() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {user.userRoles.map(ur => (
-                  <tr key={ur.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-sm text-gray-900">{ur.application.name}</p>
-                      <p className="text-xs font-mono text-gray-400">{ur.application.customId}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm text-gray-900">{ur.role.name}</p>
-                      <p className="text-xs font-mono text-gray-400">{ur.role.customId}</p>
-                    </td>
-                    <td className="hidden px-4 py-3 sm:table-cell">
-                      <RoleStatus userRole={ur} />
-                    </td>
-                    <td className="hidden px-4 py-3 md:table-cell text-sm text-gray-500">
-                      {ur.expiredAt ? new Date(ur.expiredAt).toLocaleDateString() : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => { setEditingRole(ur); setAssignOpen(true) }}>
-                          Edit
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setRemovingRole(ur)}
-                          className="text-red-500 hover:bg-red-50 hover:text-red-700">
-                          <Trash2 size={14} />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {user.userRoles.map(ur => {
+                  // The global admin's portal role cannot be removed or changed (the API refuses), only
+                  // restored to admin, active, no expiry — so Edit appears only when it needs that repair.
+                  const isProtected = user.isGlobalAdmin && ur.application.customId === 'bouncer'
+                  const needsRepair = !ur.active || !!ur.expiredAt || ur.role.customId !== 'admin'
+                  return (
+                    <tr key={ur.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-sm text-gray-900">{ur.application.name}</p>
+                        <p className="text-xs font-mono text-gray-400">{ur.application.customId}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm text-gray-900">{ur.role.name}</p>
+                        <p className="text-xs font-mono text-gray-400">{ur.role.customId}</p>
+                      </td>
+                      <td className="hidden px-4 py-3 sm:table-cell">
+                        <RoleStatus userRole={ur} />
+                      </td>
+                      <td className="hidden px-4 py-3 md:table-cell text-sm text-gray-500">
+                        {ur.expiredAt ? new Date(ur.expiredAt).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          {(!isProtected || needsRepair) && (
+                            <Button variant="ghost" size="sm" onClick={() => { setEditingRole(ur); setAssignOpen(true) }}>
+                              Edit
+                            </Button>
+                          )}
+                          {!isProtected && (
+                            <Button variant="ghost" size="sm" onClick={() => setRemovingRole(ur)}
+                              className="text-red-500 hover:bg-red-50 hover:text-red-700">
+                              <Trash2 size={14} />
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
