@@ -9,6 +9,11 @@ export async function createInvitation(opts: {
   roleId: string;
   createdById?: string | null;
   redirectUri?: string | null;
+  // Set when an API key minted this rather than an admin. Stored as a snapshot, not a relation —
+  // see the schema comment: keys are hard-deleted on revocation, so a foreign key would lose the
+  // attribution at the worst possible moment.
+  createdByApiKeyId?: string | null;
+  createdByApiKeyLabel?: string | null;
 }) {
   const rawToken = randomBytes(32).toString("hex");
   const tokenHash = createHash("sha256").update(rawToken).digest("hex");
@@ -20,6 +25,8 @@ export async function createInvitation(opts: {
       roleId: opts.roleId,
       createdById: opts.createdById ?? null,
       redirectUri: opts.redirectUri ?? null,
+      createdByApiKeyId: opts.createdByApiKeyId ?? null,
+      createdByApiKeyLabel: opts.createdByApiKeyLabel ?? null,
       expiresAt,
     },
     include: {

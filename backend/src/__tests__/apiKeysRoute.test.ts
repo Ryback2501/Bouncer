@@ -9,22 +9,20 @@ vi.mock('../services/apiKeyService', () => ({
 }))
 
 vi.mock('../lib/bouncerDefaults', () => ({
-  ensureBouncerDefaults: vi.fn(),
+  isBouncerApplication: vi.fn(),
 }))
 
-import type { Application, Role } from '@prisma/client'
 import * as svc from '../services/apiKeyService'
-import { ensureBouncerDefaults } from '../lib/bouncerDefaults'
+import { isBouncerApplication } from '../lib/bouncerDefaults'
 import router from '../routes/admin/apiKeys'
 
 const mockKey = { id: 'k1', label: 'prod', lastUsedAt: null, createdAt: new Date().toISOString() }
 const BOUNCER_ID = 'bouncer-app-id'
 
-function mockDefaults() {
-  vi.mocked(ensureBouncerDefaults).mockResolvedValue({
-    app: { id: BOUNCER_ID } as unknown as Application,
-    role: {} as unknown as Role,
-  })
+// The guard resolves the target row and compares its customId, so each test states which side of
+// the guard its subject is on rather than relying on an id matching a cached value.
+function mockDefaults(isPortalApp = false) {
+  vi.mocked(isBouncerApplication).mockResolvedValue(isPortalApp)
 }
 
 function makeApp() {
@@ -73,6 +71,7 @@ describe('POST /applications/:appId/api-keys', () => {
   // A key for the portal's own Application would be able to mint global-admin invitations, so
   // refuse to issue one at all — mirroring the guards on modifying/deleting that application.
   it('returns 403 when issuing a key for the Bouncer application', async () => {
+    mockDefaults(true)
     const res = await request(makeApp()).post(`/${BOUNCER_ID}/api-keys`).send({ label: 'nope' })
     expect(res.status).toBe(403)
     expect(svc.createApiKey).not.toHaveBeenCalled()

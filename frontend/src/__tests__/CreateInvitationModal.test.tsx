@@ -52,7 +52,7 @@ describe('CreateInvitationModal', () => {
     ])
     vi.mocked(createInvitation).mockResolvedValue({
       id: 'i1', applicationId: 'app-2', roleId: 'role-1', redirectUri: null,
-      expiresAt: '', usedAt: null, createdAt: '', createdBy: null,
+      expiresAt: '', usedAt: null, createdAt: '', createdBy: null, createdByApiKeyId: null, createdByApiKeyLabel: null,
       application: { id: 'app-2', name: 'CMS', customId: 'cms' },
       role: { id: 'role-1', name: 'Editor', customId: 'editor' },
       inviteUrl: 'http://localhost/invite/abc',
@@ -80,7 +80,7 @@ describe('CreateInvitationModal', () => {
     ])
     vi.mocked(createInvitation).mockResolvedValue({
       id: 'i1', applicationId: 'app-2', roleId: 'role-1', redirectUri: null,
-      expiresAt: '', usedAt: null, createdAt: '', createdBy: null,
+      expiresAt: '', usedAt: null, createdAt: '', createdBy: null, createdByApiKeyId: null, createdByApiKeyLabel: null,
       application: { id: 'app-2', name: 'CMS', customId: 'cms' },
       role: { id: 'role-1', name: 'Editor', customId: 'editor' },
       inviteUrl: 'http://localhost/invite/abc',
@@ -122,7 +122,7 @@ describe('CreateInvitationModal', () => {
     ])
     vi.mocked(createInvitation).mockResolvedValue({
       id: 'i1', applicationId: 'app-2', roleId: 'role-1', redirectUri: 'https://cms.example.com/welcome',
-      expiresAt: '', usedAt: null, createdAt: '', createdBy: null,
+      expiresAt: '', usedAt: null, createdAt: '', createdBy: null, createdByApiKeyId: null, createdByApiKeyLabel: null,
       application: { id: 'app-2', name: 'CMS', customId: 'cms' },
       role: { id: 'role-1', name: 'Editor', customId: 'editor' },
       inviteUrl: 'http://localhost/invite/abc',

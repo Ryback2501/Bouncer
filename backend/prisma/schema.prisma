@@ -73,6 +73,13 @@ model Invitation {
   redirectUri   String?
   createdById   String?
   createdBy     User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  // Which API key minted this invitation, when it came from /api/v1/invitations rather than an
+  // admin. Deliberately a snapshot and NOT a relation: API keys are hard-deleted on revocation, and
+  // rotation guidance is to delete the old key — so a foreign key with onDelete: SetNull would erase
+  // the attribution at exactly the moment someone is investigating. The label is copied too, so the
+  // record still reads usefully once the key is gone.
+  createdByApiKeyId    String?
+  createdByApiKeyLabel String?
   usedAt        DateTime?
   expiresAt     DateTime
   createdAt     DateTime    @default(now())

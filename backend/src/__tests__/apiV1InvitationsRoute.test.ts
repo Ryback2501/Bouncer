@@ -10,6 +10,10 @@ vi.mock('../middleware/apiKeyAuth', () => ({
       id: 'app1', name: 'My App', customId: 'my-app',
       redirectUris: ['https://app.example.com/welcome'],
     } as unknown as Application
+    // The middleware publishes the calling key so the route can record which one minted the
+    // invitation. Without this the route would read undefined here while production passed a real
+    // key, and these tests would pass on behaviour that does not exist.
+    req.bouncerApiKey = { id: 'k1', label: 'prod' }
     next()
   },
 }))
@@ -71,6 +75,8 @@ describe('POST /api/v1/invitations', () => {
       applicationId: 'app1',
       roleId: 'r1',
       redirectUri: 'https://app.example.com/welcome',
+      createdByApiKeyId: 'k1',
+      createdByApiKeyLabel: 'prod',
     })
   })
 
@@ -79,6 +85,9 @@ describe('POST /api/v1/invitations', () => {
     inv.createInvitation.mockResolvedValue({ inviteUrl: 'http://localhost:5173/invite/abc', expiresAt: new Date() })
     const res = await request(makeApp()).post('/').send({ role: 'editor' })
     expect(res.status).toBe(201)
-    expect(inv.createInvitation).toHaveBeenCalledWith({ applicationId: 'app1', roleId: 'r1', redirectUri: null })
+    expect(inv.createInvitation).toHaveBeenCalledWith({
+      applicationId: 'app1', roleId: 'r1', redirectUri: null,
+      createdByApiKeyId: 'k1', createdByApiKeyLabel: 'prod',
+    })
   })
 })

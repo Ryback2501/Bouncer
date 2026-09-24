@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import * as svc from "../../services/applicationService";
-import { ensureBouncerDefaults } from "../../lib/bouncerDefaults";
+import { isBouncerApplication } from "../../lib/bouncerDefaults";
 import { handlePrismaError } from "../../lib/prismaErrors";
 import { validateBody } from "../../middleware/validate";
 import { asyncHandler } from "../../lib/asyncHandler";
@@ -41,8 +41,7 @@ router.get("/:appId", asyncHandler(async (req: Request, res: Response) => {
 }));
 
 router.patch("/:appId", validateBody(updateApplicationSchema), asyncHandler(async (req: Request, res: Response) => {
-  const { app } = await ensureBouncerDefaults();
-  if (req.params.appId === app.id) { res.status(403).json({ error: "The Bouncer application cannot be modified" }); return; }
+  if (await isBouncerApplication(req.params.appId)) { res.status(403).json({ error: "The Bouncer application cannot be modified" }); return; }
   const { name, customId, redirectUris } = req.body as z.infer<typeof updateApplicationSchema>;
   try {
     res.json(await svc.updateApplication(req.params.appId, { name, customId, redirectUris }));
@@ -53,8 +52,7 @@ router.patch("/:appId", validateBody(updateApplicationSchema), asyncHandler(asyn
 }));
 
 router.delete("/:appId", asyncHandler(async (req: Request, res: Response) => {
-  const { app } = await ensureBouncerDefaults();
-  if (req.params.appId === app.id) { res.status(403).json({ error: "The Bouncer application cannot be deleted" }); return; }
+  if (await isBouncerApplication(req.params.appId)) { res.status(403).json({ error: "The Bouncer application cannot be deleted" }); return; }
   try {
     await svc.deleteApplication(req.params.appId);
     res.status(204).send();

@@ -29,3 +29,39 @@ export async function ensureBouncerDefaults(): Promise<{ app: Application; role:
   cached = { app, role };
   return cached;
 }
+
+// The guards below resolve the row being acted on and compare its customId, rather than comparing
+// route parameters against the ids in `cached`. That cache is populated once at boot and never
+// invalidated, so after a database reset under a running process (bash-scripts/resetDB.sh does
+// exactly that, without restarting the backend) it holds ids that match nothing — and an id-based
+// guard would silently stop firing, leaving the portal application and its admin role unprotected.
+// middleware/apiKeyAuth.ts has always worked this way; these bring the admin routes in line.
+//
+// A row that does not exist yields false, so a bad id falls through to the handler's own 404
+// rather than being swallowed here.
+
+/** Is this application the admin portal's own record? */
+export async function isBouncerApplication(applicationId: string): Promise<boolean> {
+  const app = await prisma.application.findUnique({
+    where: { id: applicationId },
+    select: { customId: true },
+  });
+  return app?.customId === BOUNCER_APP_CUSTOM_ID;
+}
+
+/**
+ * Is this the admin role of the admin portal — the role that grants a portal session?
+ *
+ * Both halves must match. Any application may have a role called `admin`, and protecting those too
+ * would stop operators managing roles in their own applications.
+ */
+export async function isBouncerAdminRole(roleId: string): Promise<boolean> {
+  const role = await prisma.role.findUnique({
+    where: { id: roleId },
+    select: { customId: true, application: { select: { customId: true } } },
+  });
+  return (
+    role?.customId === BOUNCER_ADMIN_ROLE_CUSTOM_ID &&
+    role.application.customId === BOUNCER_APP_CUSTOM_ID
+  );
+}
