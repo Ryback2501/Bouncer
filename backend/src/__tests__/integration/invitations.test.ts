@@ -273,6 +273,40 @@ describe('invitation acceptance (findOrCreateUser)', () => {
   })
 })
 
+// B-05. The bootstrap is a one-time latch now, so the global admin's portal role must not be lost
+// any other way either. Any admin can add a second role to the Bouncer app and invite the global
+// admin to it; accepting must not overwrite their admin role (that would lock the portal out).
+describe('the global admin accepting a Bouncer invite for another role', () => {
+  it('consumes the invite but keeps their portal admin role', async () => {
+    const { app: bouncerApp, role: adminRole } = await ensureBouncerDefaults()
+    const owner = await prisma.user.create({
+      data: { name: 'Owner', sub: `${PREFIX}-owner`, provider: 'google', isGlobalAdmin: true },
+    })
+    await prisma.userRole.create({
+      data: { userId: owner.id, applicationId: bouncerApp.id, roleId: adminRole.id, active: true },
+    })
+    const viewer = await prisma.role.create({
+      data: { name: 'Viewer', customId: `${PREFIX}-viewer`, applicationId: bouncerApp.id },
+    })
+    try {
+      const { raw, id } = await createInviteRow({ applicationId: bouncerApp.id, roleId: viewer.id })
+
+      const result = await findOrCreateUser(
+        { sub: `${PREFIX}-owner`, provider: 'google', name: 'Owner', email: 'owner@test.com' }, raw,
+      )
+
+      expect(result!.outcome.kind).toBe('admin')
+      const portalRole = await prisma.userRole.findUnique({
+        where: { userId_applicationId: { userId: owner.id, applicationId: bouncerApp.id } },
+      })
+      expect(portalRole!.roleId).toBe(adminRole.id)
+      expect((await prisma.invitation.findUnique({ where: { id } }))!.usedAt).not.toBeNull()
+    } finally {
+      await prisma.role.delete({ where: { id: viewer.id } }) // cascades its invitation
+    }
+  })
+})
+
 describe('POST /admin/invitations (admin UI cross-app mint)', () => {
   it('creates an invitation for a non-Bouncer app + role (201) with creator + includes', async () => {
     const res = await request(app)

@@ -122,6 +122,24 @@ describe('UserDetail', () => {
     expect(container.querySelectorAll('button.text-red-500')).toHaveLength(1)
   })
 
+  // A portal role that is inactive or expiring can still be repaired (the API allows restoring it
+  // to admin, active, no expiry), so Edit comes back for it; Remove never does.
+  it("offers Edit, not Remove, on the global admin's portal role when it needs repair", async () => {
+    const portalRole = {
+      ...mockUserRole,
+      id: 'ur-portal',
+      applicationId: 'bouncer-app',
+      active: false,
+      application: { ...mockUserRole.application, id: 'bouncer-app', name: 'Bouncer', customId: 'bouncer' },
+      role: { ...mockUserRole.role, id: 'admin-role', name: 'Admin', customId: 'admin', applicationId: 'bouncer-app' },
+    }
+    vi.mocked(getUser).mockResolvedValue({ ...mockUser, isGlobalAdmin: true, userRoles: [portalRole] })
+    const { container } = renderWithProviders(<UserDetail />, { route: '/users/u1', path: '/users/:userId' })
+    await waitFor(() => screen.getByText('Admin'))
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    expect(container.querySelector('button.text-red-500')).toBeNull()
+  })
+
   it('shows Active badge for an active role with no expiry', async () => {
     vi.mocked(getUser).mockResolvedValue(mockUser) // active: true, expiredAt: null
     renderWithProviders(<UserDetail />, { route: '/users/u1', path: '/users/:userId' })

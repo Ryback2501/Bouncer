@@ -18,7 +18,7 @@ vi.mock('../lib/bouncerDefaults', () => ({
 
 vi.mock('../prisma', () => ({
   prisma: {
-    user: { findUnique: vi.fn(), upsert: vi.fn(), create: vi.fn(), update: vi.fn() },
+    user: { findUnique: vi.fn(), count: vi.fn(), upsert: vi.fn(), create: vi.fn(), update: vi.fn() },
     userRole: { count: vi.fn(), findFirst: vi.fn(), create: vi.fn(), upsert: vi.fn() },
     invitation: { findFirst: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
@@ -39,7 +39,8 @@ describe('findOrCreateUser — admin bootstrap allowlist (H1)', () => {
     vi.clearAllMocks()
     mockConfig.ADMIN_ALLOWED_EMAILS = []
     pu.findUnique.mockResolvedValue(null) // no existing user
-    pur.count.mockResolvedValue(0) // no admins yet → bootstrap path
+    pu.count.mockResolvedValue(0) // no global admin has ever existed → bootstrap path
+    pur.count.mockResolvedValue(0)
     ptx.mockImplementation(async (cb: (tx: unknown) => unknown) =>
       cb({
         user: { create: vi.fn().mockResolvedValue({ id: 'u1', isGlobalAdmin: true }) },
@@ -66,5 +67,16 @@ describe('findOrCreateUser — admin bootstrap allowlist (H1)', () => {
     mockConfig.ADMIN_ALLOWED_EMAILS = []
     const result = await findOrCreateUser(profile)
     expect(result?.outcome.kind).toBe('admin')
+  })
+
+  // B-05. The bootstrap is a one-time latch on "a global admin exists", not a count of current admin
+  // assignments. Those can fall back to zero (the last admin's portal role removed), and a count
+  // would then hand global admin to whoever signs in next.
+  it('does not re-arm once a global admin exists, even with no admin assignment left', async () => {
+    pu.count.mockResolvedValue(1)
+    pur.count.mockResolvedValue(0)
+    const result = await findOrCreateUser(profile)
+    expect(result).toBeNull()
+    expect(ptx).not.toHaveBeenCalled()
   })
 })

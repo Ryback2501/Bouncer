@@ -5,7 +5,7 @@ import { setupGoogleStrategy } from "./googleStrategy";
 import { setupMicrosoftStrategy } from "./microsoftStrategy";
 import { setupGitHubStrategy } from "./githubStrategy";
 import { setupLinkedInStrategy } from "./linkedinStrategy";
-import { ensureBouncerDefaults } from "../lib/bouncerDefaults";
+import { ensureBouncerDefaults, BOUNCER_APP_CUSTOM_ID, BOUNCER_ADMIN_ROLE_CUSTOM_ID } from "../lib/bouncerDefaults";
 import { config } from "../config";
 
 export async function configurePassport() {
@@ -66,7 +66,7 @@ export async function findOrCreateUser(
       const tokenHash = createHash("sha256").update(inviteToken).digest("hex");
       const invitation = await tx.invitation.findFirst({
         where: { token: tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
-        include: { application: { select: { customId: true } } },
+        include: { application: { select: { customId: true } }, role: { select: { customId: true } } },
       });
       if (!invitation) return null;
 
@@ -82,26 +82,33 @@ export async function findOrCreateUser(
         },
       });
 
+      const toPortal = invitation.application.customId === BOUNCER_APP_CUSTOM_ID;
+      const isAdminInvite = toPortal && invitation.role.customId === BOUNCER_ADMIN_ROLE_CUSTOM_ID;
+      // The global admin's portal role is never replaced by an invite: any admin can add a second
+      // role to the Bouncer app and invite them to it, and since the bootstrap no longer re-opens,
+      // losing that role would lock the portal out for good. The invite is still consumed.
+      const keepsPortalAdmin = user.isGlobalAdmin && toPortal && !isAdminInvite;
+
       // Same upsert as assignmentService.assignRole, but on the transaction client.
-      await tx.userRole.upsert({
-        where: { userId_applicationId: { userId: user.id, applicationId: invitation.applicationId } },
-        update: { roleId: invitation.roleId, active: true, expiredAt: null },
-        create: {
-          userId: user.id,
-          applicationId: invitation.applicationId,
-          roleId: invitation.roleId,
-          active: true,
-        },
-      });
+      if (!keepsPortalAdmin) {
+        await tx.userRole.upsert({
+          where: { userId_applicationId: { userId: user.id, applicationId: invitation.applicationId } },
+          update: { roleId: invitation.roleId, active: true, expiredAt: null },
+          create: {
+            userId: user.id,
+            applicationId: invitation.applicationId,
+            roleId: invitation.roleId,
+            active: true,
+          },
+        });
+      }
 
       await tx.invitation.update({ where: { id: invitation.id }, data: { usedAt: new Date() } });
 
-      const isAdminInvite =
-        invitation.applicationId === bouncerApp.id && invitation.roleId === adminRole.id;
       return {
         user,
         outcome: {
-          kind: isAdminInvite ? "admin" : "app",
+          kind: isAdminInvite || keepsPortalAdmin ? "admin" : "app",
           redirectUri: invitation.redirectUri,
           appCustomId: invitation.application.customId,
         },
