@@ -1,7 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import express from 'express'
 import request from 'supertest'
-import type { Application, Role } from '@prisma/client'
 
 vi.mock('../services/roleService', () => ({
   listRoles: vi.fn(),
@@ -11,11 +10,11 @@ vi.mock('../services/roleService', () => ({
 }))
 
 vi.mock('../lib/bouncerDefaults', () => ({
-  ensureBouncerDefaults: vi.fn(),
+  isBouncerAdminRole: vi.fn(),
 }))
 
 import * as svc from '../services/roleService'
-import { ensureBouncerDefaults } from '../lib/bouncerDefaults'
+import { isBouncerAdminRole } from '../lib/bouncerDefaults'
 import router from '../routes/admin/roles'
 
 const ADMIN_ROLE_ID = 'admin-role-id'
@@ -31,11 +30,10 @@ function makeApp(_appId = 'app1') {
   return app
 }
 
-function mockDefaults() {
-  vi.mocked(ensureBouncerDefaults).mockResolvedValue({
-    app: {} as unknown as Application,
-    role: { id: ADMIN_ROLE_ID } as unknown as Role,
-  })
+// The guard resolves the target role and checks the pair (role `admin` under app `bouncer`), so
+// each test states which side of the guard its subject is on rather than matching a cached id.
+function mockDefaults(isPortalAdminRole = false) {
+  vi.mocked(isBouncerAdminRole).mockResolvedValue(isPortalAdminRole)
 }
 
 describe('GET /applications/:appId/roles', () => {
@@ -80,7 +78,7 @@ describe('PATCH /applications/:appId/roles/:roleId', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns 403 when patching the bouncer admin role', async () => {
-    mockDefaults()
+    mockDefaults(true)
     const res = await request(makeApp()).patch(`/app1/roles/${ADMIN_ROLE_ID}`).send({ name: 'X' })
     expect(res.status).toBe(403)
   })
@@ -111,7 +109,7 @@ describe('DELETE /applications/:appId/roles/:roleId', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns 403 when deleting the bouncer admin role', async () => {
-    mockDefaults()
+    mockDefaults(true)
     const res = await request(makeApp()).delete(`/app1/roles/${ADMIN_ROLE_ID}`)
     expect(res.status).toBe(403)
   })

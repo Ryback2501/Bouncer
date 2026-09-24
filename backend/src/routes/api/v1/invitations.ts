@@ -35,6 +35,10 @@ router.post("/", apiKeyAuth, validateBody(createInvitationSchema), asyncHandler(
     applicationId: application.id,
     roleId: targetRole.id,
     redirectUri: redirectUri ?? null,
+    // Record which key minted this. Without it an invitation created here has no creator at all,
+    // and a suspicious one cannot be traced back after the fact.
+    createdByApiKeyId: req.bouncerApiKey?.id ?? null,
+    createdByApiKeyLabel: req.bouncerApiKey?.label ?? null,
   });
 
   res.status(201).json({

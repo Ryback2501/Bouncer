@@ -1,7 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import express from 'express'
 import request from 'supertest'
-import type { Application, Role } from '@prisma/client'
 
 vi.mock('../services/applicationService', () => ({
   listApplications: vi.fn(),
@@ -12,11 +11,11 @@ vi.mock('../services/applicationService', () => ({
 }))
 
 vi.mock('../lib/bouncerDefaults', () => ({
-  ensureBouncerDefaults: vi.fn(),
+  isBouncerApplication: vi.fn(),
 }))
 
 import * as svc from '../services/applicationService'
-import { ensureBouncerDefaults } from '../lib/bouncerDefaults'
+import { isBouncerApplication } from '../lib/bouncerDefaults'
 import router from '../routes/admin/applications'
 
 const BOUNCER_ID = 'bouncer-app-id'
@@ -29,11 +28,10 @@ function makeApp() {
   return app
 }
 
-function mockDefaults() {
-  vi.mocked(ensureBouncerDefaults).mockResolvedValue({
-    app: { id: BOUNCER_ID } as unknown as Application,
-    role: {} as unknown as Role,
-  })
+// The guard resolves the target row and compares its customId, so each test states which side of
+// the guard its subject is on rather than relying on an id matching a cached value.
+function mockDefaults(isPortalApp = false) {
+  vi.mocked(isBouncerApplication).mockResolvedValue(isPortalApp)
 }
 
 describe('GET /applications', () => {
@@ -95,7 +93,7 @@ describe('PATCH /applications/:appId', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns 403 when patching the bouncer application', async () => {
-    mockDefaults()
+    mockDefaults(true)
     const res = await request(makeApp()).patch(`/${BOUNCER_ID}`).send({ name: 'X' })
     expect(res.status).toBe(403)
   })
@@ -133,7 +131,7 @@ describe('DELETE /applications/:appId', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns 403 when deleting the bouncer application', async () => {
-    mockDefaults()
+    mockDefaults(true)
     const res = await request(makeApp()).delete(`/${BOUNCER_ID}`)
     expect(res.status).toBe(403)
   })

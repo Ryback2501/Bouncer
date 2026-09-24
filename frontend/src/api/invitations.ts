@@ -21,6 +21,10 @@ export interface Invitation {
   usedAt: string | null
   createdAt: string
   createdBy: { name: string; email: string | null } | null
+  // Set when an API key minted the invitation (via /api/v1/invitations). A snapshot, so the label
+  // is still here after the key itself has been revoked.
+  createdByApiKeyId: string | null
+  createdByApiKeyLabel: string | null
   application: InvitationApplication
   role: InvitationRole
   // Returned only by the create endpoint (the single-use URL).

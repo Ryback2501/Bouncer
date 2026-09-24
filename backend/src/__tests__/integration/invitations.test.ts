@@ -18,6 +18,7 @@ let app1Id: string
 let editorRoleId: string
 let app2Id: string
 let rawApiKey: string
+let apiKeyId: string
 let adminInviteId: string | null = null
 // A key against the *real* Bouncer application, so it is not covered by the PREFIX cascade.
 let bouncerKeyId: string | null = null
@@ -56,7 +57,9 @@ beforeAll(async () => {
   await prisma.role.create({ data: { name: 'Viewer', customId: 'viewer', applicationId: app2Id } })
 
   rawApiKey = `bncr_${randomBytes(32).toString('hex')}`
-  await prisma.apiKey.create({ data: { applicationId: app1Id, keyHash: hash(rawApiKey), label: 'invite' } })
+  apiKeyId = (await prisma.apiKey.create({
+    data: { applicationId: app1Id, keyHash: hash(rawApiKey), label: 'invite' },
+  })).id
 
   // The admin POST route writes Invitation.createdById = req.user.id. Ensure a real user row
   // exists for the synthetic test admin so the FK resolves.
@@ -98,6 +101,28 @@ describe('POST /api/v1/invitations (mint)', () => {
     expect(created[0].roleId).toBe(editorRoleId)
     expect(created[0].redirectUri).toBe('https://app.example.com/welcome')
     expect(created[0].createdById).toBeNull()
+    expect(created[0].createdByApiKeyId).toBe(apiKeyId)
+    expect(created[0].createdByApiKeyLabel).toBe('invite')
+  })
+
+  // The attribution is a snapshot, not a foreign key: revoking (hard-deleting) the key that minted
+  // an invitation must not erase who minted it.
+  it('keeps the key attribution after that key is deleted', async () => {
+    const raw = `bncr_${randomBytes(32).toString('hex')}`
+    const key = await prisma.apiKey.create({
+      data: { applicationId: app1Id, keyHash: hash(raw), label: 'short-lived' },
+    })
+    const res = await request(app)
+      .post('/api/v1/invitations')
+      .set('Authorization', `Bearer ${raw}`)
+      .send({ role: 'editor' })
+    expect(res.status).toBe(201)
+
+    await prisma.apiKey.delete({ where: { id: key.id } })
+
+    const minted = await prisma.invitation.findFirst({ where: { createdByApiKeyId: key.id } })
+    expect(minted).not.toBeNull()
+    expect(minted!.createdByApiKeyLabel).toBe('short-lived')
   })
 
   // B-03. The admin portal is itself an Application holding the `admin` role that grants a portal

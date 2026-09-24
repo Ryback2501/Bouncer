@@ -5,6 +5,10 @@ declare global {
     interface User extends PrismaUser { [key: string]: unknown }
     interface Request {
       bouncerApp?: PrismaApplication;
+      // The API key the request authenticated with, published by apiKeyAuth so routes can record
+      // which key performed an action. Narrowed to id + label on purpose: the full Prisma row
+      // carries `keyHash`, which has no business travelling around on the request object.
+      bouncerApiKey?: { id: string; label: string | null };
       // Set by the OAuth verify step, read by the callback handler to decide how to finish:
       // admin invites/logins keep a portal session; app invites are logged out + redirected.
       // Lives on the request (not the session) so it survives passport's session regeneration

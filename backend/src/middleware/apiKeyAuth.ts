@@ -54,5 +54,8 @@ export const apiKeyAuth = asyncHandler(async (req: Request, res: Response, next:
   }
 
   req.bouncerApp = apiKey.application;
+  // Published so routes can record which key acted — an invitation minted here is otherwise
+  // untraceable. Only id and label: the key hash stays in this function.
+  req.bouncerApiKey = { id: apiKey.id, label: apiKey.label };
   next();
 });

@@ -25,6 +25,8 @@ function inv(overrides: Partial<Invitation>): Invitation {
     usedAt: null,
     createdAt: new Date().toISOString(),
     createdBy: { name: 'Test Admin', email: 'admin@test.com' },
+    createdByApiKeyId: null,
+    createdByApiKeyLabel: null,
     application: { id: 'app-1', name: 'Bouncer', customId: 'bouncer' },
     role: { id: 'role-1', name: 'Admin', customId: 'admin' },
     ...overrides,
@@ -59,6 +61,23 @@ describe('InvitationList', () => {
     await waitFor(() => expect(screen.getAllByRole('button', { name: /create invitation/i })[0]).toBeEnabled())
     fireEvent.click(screen.getAllByRole('button', { name: /create invitation/i })[0])
     await waitFor(() => expect(screen.getByText(/select an application/i)).toBeInTheDocument())
+  })
+
+  it('attributes an invitation minted by an API key to that key\'s label', async () => {
+    vi.mocked(getInvitations).mockResolvedValue([
+      inv({ createdBy: null, createdByApiKeyId: 'k-1', createdByApiKeyLabel: 'signup-service' }),
+    ])
+    renderPage()
+    await waitFor(() => expect(screen.getByText('API key: signup-service')).toBeInTheDocument())
+  })
+
+  // Labels are optional on API keys; an unlabelled key must still be distinguishable from no creator.
+  it('attributes an invitation minted by an unlabelled API key', async () => {
+    vi.mocked(getInvitations).mockResolvedValue([
+      inv({ createdBy: null, createdByApiKeyId: 'k-1', createdByApiKeyLabel: null }),
+    ])
+    renderPage()
+    await waitFor(() => expect(screen.getByText('API key')).toBeInTheDocument())
   })
 
   it('shows the empty state and a create button when there are no invitations', async () => {

@@ -125,7 +125,10 @@ export function InvitationList() {
                           <Badge variant="gray">{inv.role.name}</Badge>
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-900">
-                          {inv.createdBy?.name ?? <span className="italic text-gray-400">—</span>}
+                          {inv.createdBy?.name
+                            ?? (inv.createdByApiKeyId
+                              ? (inv.createdByApiKeyLabel ? `API key: ${inv.createdByApiKeyLabel}` : 'API key')
+                              : <span className="italic text-gray-400">—</span>)}
                         </td>
                         <td className="hidden px-4 py-4 text-sm text-gray-500 sm:table-cell">
                           {new Date(inv.createdAt).toLocaleDateString()}

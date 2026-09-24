@@ -64,7 +64,28 @@ describe('invitationService', () => {
       }))
       await createInvitation({ applicationId: 'a1', roleId: 'r1' })
       expect(p.create).toHaveBeenCalledWith(expect.objectContaining({
-        data: expect.objectContaining({ createdById: null, redirectUri: null }),
+        data: expect.objectContaining({
+          createdById: null, redirectUri: null,
+          createdByApiKeyId: null, createdByApiKeyLabel: null,
+        }),
+      }))
+    })
+
+    // Stored as a snapshot rather than a foreign key: API keys are hard-deleted on revocation, so a
+    // relation would erase the attribution exactly when someone is investigating.
+    it('records which API key minted the invitation, label included', async () => {
+      p.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+        id: 'i3', token: data.token, createdAt: new Date(), expiresAt: data.expiresAt, usedAt: null,
+        createdBy: null,
+      }))
+      await createInvitation({
+        applicationId: 'a1', roleId: 'r1',
+        createdByApiKeyId: 'key-1', createdByApiKeyLabel: 'production',
+      })
+      expect(p.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          createdByApiKeyId: 'key-1', createdByApiKeyLabel: 'production',
+        }),
       }))
     })
   })

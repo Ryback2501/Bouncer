@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import * as svc from "../../services/apiKeyService";
-import { ensureBouncerDefaults } from "../../lib/bouncerDefaults";
+import { isBouncerApplication } from "../../lib/bouncerDefaults";
 import { handlePrismaError } from "../../lib/prismaErrors";
 import { validateBody } from "../../middleware/validate";
 import { asyncHandler } from "../../lib/asyncHandler";
@@ -22,8 +22,7 @@ router.get("/", asyncHandler(async (req: Request, res: Response) => {
 // application. Listing and revoking below stay open, so a key from an older deployment can still
 // be found and removed; apiKeyAuth rejects it at use in the meantime.
 router.post("/", validateBody(createApiKeySchema), asyncHandler(async (req: Request, res: Response) => {
-  const { app } = await ensureBouncerDefaults();
-  if (req.params.appId === app.id) {
+  if (await isBouncerApplication(req.params.appId)) {
     res.status(403).json({ error: "The Bouncer application cannot be issued API keys" });
     return;
   }
