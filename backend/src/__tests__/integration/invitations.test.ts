@@ -307,6 +307,39 @@ describe('the global admin accepting a Bouncer invite for another role', () => {
   })
 })
 
+describe('the global admin, portal role expired, accepting a Bouncer invite for another role', () => {
+  // Their role is kept (never downgraded), but they must not be routed into a portal session that
+  // the per-request check will then reject — the outcome follows the role they actually hold.
+  it('keeps the role but does not claim a portal session', async () => {
+    const { app: bouncerApp, role: adminRole } = await ensureBouncerDefaults()
+    const owner = await prisma.user.create({
+      data: { name: 'Owner 2', sub: `${PREFIX}-owner2`, provider: 'google', isGlobalAdmin: true },
+    })
+    await prisma.userRole.create({
+      data: {
+        userId: owner.id, applicationId: bouncerApp.id, roleId: adminRole.id, active: true,
+        expiredAt: new Date(Date.now() - 60_000),
+      },
+    })
+    const viewer = await prisma.role.create({
+      data: { name: 'Viewer', customId: `${PREFIX}-viewer2`, applicationId: bouncerApp.id },
+    })
+    try {
+      const { raw } = await createInviteRow({ applicationId: bouncerApp.id, roleId: viewer.id })
+      const result = await findOrCreateUser(
+        { sub: `${PREFIX}-owner2`, provider: 'google', name: 'Owner 2', email: 'owner2@test.com' }, raw,
+      )
+      expect(result!.outcome.kind).toBe('app')
+      const portalRole = await prisma.userRole.findUnique({
+        where: { userId_applicationId: { userId: owner.id, applicationId: bouncerApp.id } },
+      })
+      expect(portalRole!.roleId).toBe(adminRole.id)
+    } finally {
+      await prisma.role.delete({ where: { id: viewer.id } })
+    }
+  })
+})
+
 describe('POST /admin/invitations (admin UI cross-app mint)', () => {
   it('creates an invitation for a non-Bouncer app + role (201) with creator + includes', async () => {
     const res = await request(app)

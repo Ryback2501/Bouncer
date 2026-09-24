@@ -105,10 +105,24 @@ export async function findOrCreateUser(
 
       await tx.invitation.update({ where: { id: invitation.id }, data: { usedAt: new Date() } });
 
+      // A kept portal role only earns a portal session if it is usable: the per-request session check
+      // would otherwise reject an inactive or expired one straight after the redirect.
+      const keptRoleUsable =
+        keepsPortalAdmin &&
+        (await tx.userRole.count({
+          where: {
+            userId: user.id,
+            active: true,
+            OR: [{ expiredAt: null }, { expiredAt: { gt: new Date() } }],
+            application: { customId: BOUNCER_APP_CUSTOM_ID },
+            role: { customId: BOUNCER_ADMIN_ROLE_CUSTOM_ID },
+          },
+        })) > 0;
+
       return {
         user,
         outcome: {
-          kind: isAdminInvite || keepsPortalAdmin ? "admin" : "app",
+          kind: isAdminInvite || keptRoleUsable ? "admin" : "app",
           redirectUri: invitation.redirectUri,
           appCustomId: invitation.application.customId,
         },
@@ -137,8 +151,8 @@ export async function findOrCreateUser(
   // A one-time latch, not a count of current admin assignments. Assignments can drop back to zero
   // (the last admin's portal role removed), and a count would then hand global admin to whoever
   // signs in next. `isGlobalAdmin` is set only here and the API cannot delete that user or clear
-  // the flag, so once it exists the bootstrap never re-opens. It also reads no cached ids, which
-  // match nothing after a database reset under a running process.
+  // the flag, so once it exists the bootstrap never re-opens. The check itself reads no cached ids,
+  // so a database reset under a running process cannot open it either.
   const bootstrapped = await prisma.user.count({ where: { isGlobalAdmin: true } });
   if (bootstrapped === 0) {
     // Bootstrap guard: only allowlisted emails may become the first global admin. This closes
