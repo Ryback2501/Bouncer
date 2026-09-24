@@ -12,6 +12,7 @@ import path from "path";
 import { Pool } from "pg";
 import { config } from "./config";
 import logger from "./lib/logger";
+import { redactReq, redactRes } from "./lib/httpLogSerializers";
 import authRouter from "./routes/auth";
 import adminRouter from "./routes/admin";
 import accessRouter from "./routes/api/v1/access";
@@ -39,7 +40,9 @@ export function createApp() {
   }
 
   // ── Request logging ───────────────────────────────────────────────────────
-  app.use(pinoHttp({ logger }));
+  // Serializers strip credentials from the logged URL, query and Location header: invitation
+  // tokens (for links minted before they moved into the URL fragment) and OAuth code/state.
+  app.use(pinoHttp({ logger, serializers: { req: redactReq, res: redactRes } }));
 
   // ── Security ──────────────────────────────────────────────────────────────
   // CSP for the merged service that serves both the SPA (HTML/CSS/JS/fonts/images) and

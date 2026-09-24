@@ -90,7 +90,7 @@ describe('POST /api/v1/invitations (mint)', () => {
       .send({ role: 'editor', redirectUri: 'https://app.example.com/welcome' })
 
     expect(res.status).toBe(201)
-    expect(res.body.inviteUrl).toMatch(/\/invite\/[0-9a-f]{64}$/)
+    expect(res.body.inviteUrl).toMatch(/\/invite#[0-9a-f]{64}$/)
     expect(res.body.expiresAt).toBeTruthy()
 
     const created = await prisma.invitation.findMany({ where: { applicationId: app1Id } })
@@ -255,7 +255,7 @@ describe('POST /admin/invitations (admin UI cross-app mint)', () => {
       .send({ applicationId: app1Id, roleId: editorRoleId, redirectUri: 'https://app.example.com/welcome' })
 
     expect(res.status).toBe(201)
-    expect(res.body.inviteUrl).toMatch(/\/invite\/[0-9a-f]{64}$/)
+    expect(res.body.inviteUrl).toMatch(/\/invite#[0-9a-f]{64}$/)
     expect(res.body.applicationId).toBe(app1Id)
     expect(res.body.roleId).toBe(editorRoleId)
     expect(res.body.application?.customId).toBe(`${PREFIX}-app1`)

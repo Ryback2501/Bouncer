@@ -65,6 +65,27 @@ See `backend/.env.example` for the full list.
   key that already exists is rejected across the whole of `/api/v1` (`403 api_key_not_permitted`) and
   logged as a warning. Such a key remains visible in the admin UI so it can be revoked.
 
+## Invitation links
+
+- Single-use, 24-hour expiry, stored only as a SHA-256 hash.
+- **The token never reaches a server.** It is carried in the URL **fragment**
+  (`https://…/invite#<token>`), which browsers do not transmit, so it appears in no access log —
+  Bouncer's, the reverse proxy's, or any CDN's. The admin portal sends it onward in a request body,
+  never a URL, and the OAuth step reads it from the session.
+- **Deliver the link verbatim.** Any intermediary that rebuilds the URL server-side — some
+  click-trackers and link rewriters — never sees the fragment and will silently strip it, producing
+  a link that does not work.
+- **Redemption requires a deliberate choice.** Opening an invite link only *describes* the
+  invitation; the token is attached to the browser session solely when the recipient picks a sign-in
+  provider on that page. Viewing a forwarded link therefore cannot make an unrelated later sign-in
+  redeem it. One invitation is held at a time, so choosing a provider on a second invite replaces the
+  first.
+- **An invite link is a bearer credential — treat it like a password reset link.** Anyone holding it
+  can redeem it, and nothing binds it to the intended recipient's identity. In particular, a tenant
+  administrator who can mint invitations for their own application can send one to a Bouncer
+  administrator and, if that person accepts it, have them enrolled in that application and role.
+  Acceptance is always an explicit action on the invite page, but it is not otherwise restricted.
+
 ## Application security
 
 - **Headers:** `helmet` sets them for both the API and the admin SPA, which are served from the
@@ -83,8 +104,11 @@ See `backend/.env.example` for the full list.
   starting a second sign-in in another tab invalidates the first. The stale tab lands on
   `/login?error=auth_failed`.
 - **Input validation:** Zod on all request bodies/queries.
-- **Logging:** `Authorization`, `Cookie`, and `Set-Cookie` are redacted; internal error messages are
-  never returned to clients in production.
+- **Logging:** `Authorization`, `Cookie`, and `Set-Cookie` are redacted, and request URLs are
+  sanitised before they are written — the logged `url`, the parsed `query`, and the `Location`
+  response header all have the values of `invite`, `code`, `state` and `nonce` blanked, in both the
+  access log and the error handler. Parameter names survive so a log line is still diagnostic.
+  Internal error messages are never returned to clients in production.
 
 ## Known / accepted
 

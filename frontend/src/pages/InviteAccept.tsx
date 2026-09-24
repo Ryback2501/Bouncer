@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { Shield } from 'lucide-react'
 
 const providers = [
@@ -50,14 +50,27 @@ const providers = [
 type State = 'loading' | 'valid' | 'invalid'
 
 export function InviteAccept() {
-  const { token } = useParams<{ token: string }>()
-  const [state, setState] = useState<State>('loading')
+  // The token arrives in the URL fragment, which the browser never sends to any server — so it
+  // reaches no access log on its way here. It is handed to the backend in a POST body instead,
+  // and the backend stashes it in the session, which is why the provider links below need no
+  // query string.
+  const { hash } = useLocation()
+  const token = hash.startsWith('#') ? hash.slice(1) : hash
+
+  // No fragment means no token to check, so start in the terminal state rather than setting it
+  // from inside the effect.
+  const [state, setState] = useState<State>(token ? 'loading' : 'invalid')
   const [expiresAt, setExpiresAt] = useState<string | null>(null)
   const [appName, setAppName] = useState<string | null>(null)
   const [roleName, setRoleName] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`/auth/invite/${token}`)
+    if (!token) return
+    fetch('/auth/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
       .then(r => r.json())
       .then((data: {
         valid: boolean
@@ -76,6 +89,25 @@ export function InviteAccept() {
       })
       .catch(() => setState('invalid'))
   }, [token])
+
+  // Staging happens here, on a deliberate choice of provider — never on page load. Handing the
+  // token over only at this point is what keeps merely *opening* an invite link from arming the
+  // session, which would otherwise make an unrelated later sign-in redeem the invitation.
+  const accept = async (providerPath: string) => {
+    const res = await fetch('/auth/invite/stage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    }).catch(() => null)
+
+    if (!res?.ok) {
+      setState('invalid')
+      return
+    }
+    // assign() rather than setting location.href: a full navigation is what hands the browser to
+    // the OAuth provider, and it keeps the linter's immutability rule satisfied.
+    window.location.assign(providerPath)
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 flex items-center justify-center p-4">
@@ -122,14 +154,15 @@ export function InviteAccept() {
               )}
               <div className="space-y-3">
                 {providers.map(p => (
-                  <a
+                  <button
                     key={p.name}
-                    href={`${p.base}?invite=${encodeURIComponent(token!)}`}
+                    type="button"
+                    onClick={() => accept(p.base)}
                     className="flex w-full items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:shadow-md"
                   >
                     {p.icon}
                     <span>Continue with {p.name}</span>
-                  </a>
+                  </button>
                 ))}
               </div>
             </>

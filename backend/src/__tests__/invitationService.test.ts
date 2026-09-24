@@ -35,8 +35,9 @@ describe('invitationService', () => {
       }))
       const result = await createInvitation({ applicationId: 'a1', roleId: 'r1', createdById: 'u1', redirectUri: 'https://app.example/welcome' })
 
-      // inviteUrl contains the raw token (64 hex chars); the hash stored in DB is never exposed
-      expect(result.inviteUrl).toMatch(/^http:\/\/localhost:5173\/invite\/[0-9a-f]{64}$/)
+      // The raw token (64 hex) rides in the URL *fragment* so a browser never transmits it; the
+      // hash stored in the DB is never exposed.
+      expect(result.inviteUrl).toMatch(/^http:\/\/localhost:5173\/invite#[0-9a-f]{64}$/)
       expect(result).not.toHaveProperty('token')
       expect(p.create).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({

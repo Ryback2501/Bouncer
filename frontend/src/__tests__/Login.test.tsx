@@ -23,4 +23,17 @@ describe('Login page', () => {
     const link = screen.getByText('Continue with Google').closest('a')
     expect(link).toHaveAttribute('href', '/auth/google')
   })
+
+  // The page used to append an ?invite= query parameter it read from its own URL. Nothing ever
+  // generated that link, and a token in a URL is a token in an access log — the branch is gone and
+  // must not come back.
+  it('provider links never carry a query string, even with ?invite= in the address', () => {
+    window.history.replaceState({}, '', '/login?invite=sometoken')
+    render(<Login />)
+    for (const name of ['Google', 'Microsoft', 'GitHub', 'LinkedIn']) {
+      const href = screen.getByText(`Continue with ${name}`).closest('a')!.getAttribute('href')!
+      expect(href).not.toContain('?')
+      expect(href).not.toContain('sometoken')
+    }
+  })
 })
