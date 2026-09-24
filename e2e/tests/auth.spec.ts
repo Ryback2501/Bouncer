@@ -29,7 +29,7 @@ test.describe('Login page', () => {
 
 test.describe('Invite accept page', () => {
   test('shows invalid/expired message for a non-existent invite token', async ({ page }) => {
-    await page.goto('/invite/0000000000000000000000000000000000000000000000000000000000000000')
+    await page.goto('/invite#0000000000000000000000000000000000000000000000000000000000000000')
     await expect(page.getByText(/invalid|expired/i)).toBeVisible()
   })
 })

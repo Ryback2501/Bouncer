@@ -48,10 +48,6 @@ const providers = [
 export function Login() {
   const params = new URLSearchParams(window.location.search)
   const error = params.get('error')
-  const invite = params.get('invite')
-
-  const providerHref = (base: string) =>
-    invite ? `${base}?invite=${encodeURIComponent(invite)}` : base
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 flex items-center justify-center p-4">
@@ -68,7 +64,7 @@ export function Login() {
         {/* Card */}
         <div className="rounded-2xl bg-white/10 backdrop-blur border border-white/20 shadow-2xl p-8">
           <h2 className="text-center text-base font-semibold text-white mb-6">
-            {invite ? 'Accept your invitation' : 'Sign in as administrator'}
+            Sign in as administrator
           </h2>
 
           {error && (
@@ -81,7 +77,7 @@ export function Login() {
             {providers.map(p => (
               <a
                 key={p.name}
-                href={providerHref(p.href)}
+                href={p.href}
                 className="flex w-full items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:shadow-md"
               >
                 {p.icon}
@@ -92,7 +88,7 @@ export function Login() {
         </div>
 
         <p className="mt-6 text-center text-xs text-gray-500">
-          {invite ? 'You were invited to join Bouncer.' : 'Admin access only. Contact your administrator if you need access.'}
+          Admin access only. Contact your administrator if you need access.
         </p>
       </div>
     </div>

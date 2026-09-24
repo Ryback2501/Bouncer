@@ -1,13 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { InviteAccept } from '../pages/InviteAccept'
 
-function renderInviteAccept(token = 'abc123') {
+// The token rides in the URL fragment, so the server never receives it; the component reads it
+// from location.hash and posts it in a request body.
+function renderInviteAccept(token: string | null = 'abc123') {
   return render(
-    <MemoryRouter initialEntries={[`/invite/${token}`]}>
+    <MemoryRouter initialEntries={[token === null ? '/invite' : `/invite#${token}`]}>
       <Routes>
-        <Route path="/invite/:token" element={<InviteAccept />} />
+        <Route path="/invite" element={<InviteAccept />} />
       </Routes>
     </MemoryRouter>
   )
@@ -50,14 +53,74 @@ describe('InviteAccept', () => {
     expect(screen.getByText('Continue with LinkedIn')).toBeInTheDocument()
   })
 
-  it('OAuth links include invite token in query string', async () => {
+  // The token must not reappear in any URL — the provider controls are buttons, not links, and
+  // the backend reads the token from the session that the stage call populated.
+  it('provider controls carry no token and no href', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      json: async () => ({ valid: true, expiresAt: null }),
+      ok: true, json: async () => ({ valid: true, expiresAt: null }),
     } as Response)
     renderInviteAccept('tok99')
     await waitFor(() => screen.getByText('Continue with Google'))
-    const googleLink = screen.getByText('Continue with Google').closest('a')
-    expect(googleLink).toHaveAttribute('href', '/auth/google?invite=tok99')
+    for (const name of ['Google', 'Microsoft', 'GitHub', 'LinkedIn']) {
+      const control = screen.getByText(`Continue with ${name}`).closest('button')
+      expect(control).toBeInTheDocument()
+      expect(control!.getAttribute('href')).toBeNull()
+    }
+    expect(document.body.innerHTML).not.toContain('tok99')
+  })
+
+  // The load-time call must be preview only. If it staged the token, anyone who merely opened a
+  // forwarded invite link would redeem that invitation on their next unrelated sign-in.
+  it('does not stage the token on page load', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true, json: async () => ({ valid: true, expiresAt: null }),
+    } as Response)
+    renderInviteAccept('tok99')
+    await waitFor(() => screen.getByText('Continue with Google'))
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(fetchSpy.mock.calls[0][0]).toBe('/auth/invite')
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('stage'))).toBe(false)
+  })
+
+  it('stages the token only when a provider is chosen, then navigates', async () => {
+    const assign = vi.fn()
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, assign },
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true, json: async () => ({ valid: true, expiresAt: null }),
+    } as Response)
+    renderInviteAccept('tok99')
+    await waitFor(() => screen.getByText('Continue with Google'))
+
+    await userEvent.click(screen.getByText('Continue with Google'))
+
+    const stageCall = fetchSpy.mock.calls.find(([url]) => url === '/auth/invite/stage')
+    expect(stageCall).toBeDefined()
+    expect(stageCall![1]?.method).toBe('POST')
+    expect(JSON.parse(String(stageCall![1]?.body))).toEqual({ token: 'tok99' })
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/auth/google'))
+  })
+
+  it('sends the token in a POST body, never in the URL', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true, json: async () => ({ valid: true, expiresAt: null }),
+    } as Response)
+    renderInviteAccept('tok99')
+    await waitFor(() => screen.getByText('Continue with Google'))
+    const [url, init] = fetchSpy.mock.calls[0]
+    expect(url).toBe('/auth/invite')
+    expect(String(url)).not.toContain('tok99')
+    expect(init?.method).toBe('POST')
+    expect(JSON.parse(String(init?.body))).toEqual({ token: 'tok99' })
+  })
+
+  it('shows the invalid state when there is no fragment at all', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    renderInviteAccept(null)
+    await waitFor(() => expect(screen.getByText('Invitation not found')).toBeInTheDocument())
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 
   it('shows the application and role names when provided', async () => {

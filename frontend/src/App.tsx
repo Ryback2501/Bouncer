@@ -13,6 +13,7 @@ import { ApiKeyList } from './pages/ApiKeys/ApiKeyList'
 import { AssignmentList } from './pages/Assignments/AssignmentList'
 import { InvitationList } from './pages/Invitations/InvitationList'
 import { InviteAccept } from './pages/InviteAccept'
+import { LegacyInviteRedirect } from './pages/LegacyInviteRedirect'
 import { Invited } from './pages/Invited'
 
 function ProtectedRoutes() {
@@ -51,7 +52,12 @@ export default function App() {
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/invite/:token" element={<InviteAccept />} />
+            <Route path="/invite" element={<InviteAccept />} />
+            {/* Invitations minted before the token moved into the fragment. Those links are already
+                out in the wild with a 24h life, so redirect them rather than dropping the recipient
+                on a generic login page. The server masks the token in its logs (lib/redactUrl).
+                Safe to delete once no pre-upgrade invitation can still be live. */}
+            <Route path="/invite/:token" element={<LegacyInviteRedirect />} />
             <Route path="/invited" element={<Invited />} />
             <Route path="/*" element={<ProtectedRoutes />} />
           </Routes>

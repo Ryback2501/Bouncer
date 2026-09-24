@@ -31,12 +31,17 @@ export function setupLinkedInStrategy() {
       async (req: Request, _issuer: string, profile: passport.Profile, done: VerifyCallback) => {
         try {
           const email = profile.emails?.[0]?.value ?? "";
+          // Consume the staged token up front, whatever happens next. If it survived a failed
+          // redemption (invite already used, revoked or expired) every later sign-in from this
+          // browser would take the invite branch again and fail the same way, locking the user out
+          // of an otherwise valid login with no way to diagnose it.
+          const inviteToken = req.session.inviteToken;
+          delete req.session.inviteToken;
           const result = await findOrCreateUser(
             { sub: profile.id, provider: "linkedin", name: profile.displayName ?? "", email },
-            req.session.inviteToken
+            inviteToken
           );
           if (!result) return done(null, false as unknown as Express.User);
-          delete req.session.inviteToken;
           req.inviteOutcome = result.outcome;
           done(null, result.user);
         } catch (err) {

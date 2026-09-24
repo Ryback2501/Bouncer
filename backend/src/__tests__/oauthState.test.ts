@@ -98,6 +98,18 @@ describe('OAuth authorization request hardening', () => {
   })
 })
 
+// The invite token used to ride in ?invite= on this request, which put it in the access log. It now
+// reaches the session via POST /auth/invite instead, so the start URL must carry nothing.
+describe('OAuth start no longer accepts an invite token in the URL', () => {
+  it('ignores ?invite= and does not forward it to the provider', async () => {
+    const res = await request(app).get('/auth/google?invite=sometoken')
+    expect(res.status).toBe(302)
+    const url = new URL(res.headers.location)
+    expect(url.searchParams.get('invite')).toBeNull()
+    expect(res.headers.location).not.toContain('sometoken')
+  })
+})
+
 describe('OAuth callback state verification', () => {
   // The heart of the fix. A callback arriving with a state the server never issued must be
   // rejected. This needs no network stubbing: every strategy verifies state and fails before it

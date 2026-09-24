@@ -30,7 +30,10 @@ export async function createInvitation(opts: {
   });
   return {
     ...invitation,
-    inviteUrl: `${config.FRONTEND_URL}/invite/${rawToken}`,
+    // The token goes in the URL *fragment*, not the path: a browser never transmits a fragment, so
+    // the token reaches no server, access log or CDN on its way to the recipient. The SPA reads it
+    // from location.hash and sends it to the server in a request body.
+    inviteUrl: `${config.FRONTEND_URL}/invite#${rawToken}`,
   };
 }
 

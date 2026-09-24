@@ -139,8 +139,13 @@ components:
         inviteUrl:
           type: string
           format: uri
-          description: Single-use URL to deliver to the user; they accept by signing in with an OAuth provider.
-          example: "http://localhost:5173/invite/3f1a9c0b...e9"
+          description: >-
+            Single-use URL to deliver to the user; they accept by signing in with an OAuth provider.
+            The token is carried in the URL **fragment** (after `#`), which browsers never send to a
+            server — so it stays out of access logs along the way. Deliver the string verbatim: any
+            intermediary that rebuilds the URL server-side (some click-trackers) will drop the
+            fragment and the link will not work.
+          example: "http://localhost:5173/invite#3f1a9c0b...e9"
         expiresAt:
           type: string
           format: date-time
@@ -274,7 +279,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/InvitationCreated'
               example:
-                inviteUrl: "http://localhost:5173/invite/3f1a9c0b...e9"
+                inviteUrl: "http://localhost:5173/invite#3f1a9c0b...e9"
                 expiresAt: "2026-05-26T09:24:16.000Z"
         '400':
           description: Validation failed, or redirect URI origin not in the application allowlist
