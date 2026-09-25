@@ -100,6 +100,8 @@ Clone the repo, then:
 
 To stop: `bash bash-scripts/stopBouncer.sh` (preserves the Postgres volume). Use `--purge` to also drop the volume and locally-built images.
 
+`docker-compose.yml` has no default database password, so a bare `docker compose …` command stops with "POSTGRES_PASSWORD must be set". Run other compose commands through the wrapper, which supplies it from `backend/.env`: `bash bash-scripts/compose.sh ps` (or `logs -f bouncer`, etc.).
+
 ## OAuth provider setup
 
 Bouncer signs users in via OAuth and uses the provider-returned `sub` claim as the canonical user identifier. **At least one provider must be configured** for anyone to sign in — pick whichever fits your audience and skip the others. The callback URL pattern is always `<your-bouncer-origin>/auth/<provider>/callback`, where `<your-bouncer-origin>` is the URL users visit in their browser (e.g. `http://localhost` for local docker, or `https://bouncer.example.com` in production). The examples below assume local docker (`http://localhost`); swap in your real origin for a deployed instance.
