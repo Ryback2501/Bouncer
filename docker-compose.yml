@@ -4,10 +4,15 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-bouncer}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bouncer}
+      # No default: a known password on a published database is B-08. runBouncer.sh generates one
+      # into backend/.env for new installs.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (URL-safe; e.g. openssl rand -hex 24)}
       POSTGRES_DB: ${POSTGRES_DB:-bouncer}
     ports:
-      - "5432:5432"
+      # Loopback only: host-side tools (npm run dev, resetDB.sh, Prisma Studio) reach it on
+      # localhost, nothing on the network does. A bare "5432:5432" binds every interface, and
+      # Docker's published ports bypass host firewalls such as ufw.
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -39,7 +44,7 @@ services:
       # user's backend/.env can keep host-side values (e.g. DATABASE_URL=…@localhost) for
       # ad-hoc `npm run dev`; the dockerized stack always gets compose-network hostnames
       # and the host-published origin.
-      DATABASE_URL: postgresql://${POSTGRES_USER:-bouncer}:${POSTGRES_PASSWORD:-bouncer}@postgres:5432/${POSTGRES_DB:-bouncer}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bouncer}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-bouncer}
       FRONTEND_URL: http://localhost
     depends_on:
       postgres:

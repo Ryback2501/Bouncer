@@ -22,15 +22,20 @@ ensure_env_file() {
     return 1
   fi
   echo "--- Generating $ENV_FILE from .env.example ---"
-  local session_secret encryption_key
+  local session_secret encryption_key postgres_password
   session_secret="$(openssl rand -base64 48 | tr -d '\n')"
   encryption_key="$(openssl rand -base64 32 | tr -d '\n')"
+  # Hex: URL-safe, so it can sit inside DATABASE_URL unescaped. Never a shared default (B-08).
+  postgres_password="$(openssl rand -hex 24)"
   awk \
     -v ss="$session_secret" \
     -v ek="$encryption_key" \
+    -v pp="$postgres_password" \
     '
       /^SESSION_SECRET=/ { print "SESSION_SECRET=" ss; next }
       /^ENCRYPTION_KEY=/ { print "ENCRYPTION_KEY=" ek; next }
+      /^POSTGRES_PASSWORD=/ { print "POSTGRES_PASSWORD=" pp; next }
+      /^DATABASE_URL=/ { gsub(/<POSTGRES_PASSWORD>/, pp); print; next }
       { print }
     ' "$ENV_EXAMPLE" > "$ENV_FILE"
   chmod 600 "$ENV_FILE"
