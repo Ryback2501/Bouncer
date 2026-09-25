@@ -25,7 +25,7 @@ fi
 echo ""
 echo "Bouncer is running:"
 echo "  Bouncer (SPA + API)  http://localhost"
-echo "  Postgres             localhost:5432"
+echo "  Postgres             127.0.0.1:5432 (this machine only)"
 echo ""
 echo "Images in use:"
 compose images

@@ -59,7 +59,13 @@ advisory. See `backend/.env.example` for the full list.
 - **Transport:** require TLS — `...?sslmode=require` (or `verify-full` with a CA).
 - **Least privilege:** connect as a role that owns no more than the app schema; do **not** use a
   superuser or the DB owner for the app runtime.
-- **Strong credentials:** never ship the dev `bouncer:bouncer` password; use a secrets manager.
+- **Strong credentials:** there is no default database password. `docker-compose.yml` refuses to
+  start without `POSTGRES_PASSWORD`, and `runBouncer.sh` generates a random one for a new
+  `backend/.env`. Postgres only reads it when the volume is first created; to rotate, run
+  `ALTER USER … PASSWORD …` inside the database as well. In production, use a secrets manager.
+- **Network exposure:** the repo's compose file publishes Postgres on `127.0.0.1:5432` only, for
+  host-side dev tools. Never publish it on all interfaces (`"5432:5432"`): Docker's published
+  ports bypass host firewalls such as ufw. The README's deployment example publishes no DB port.
 - **At rest:** run Postgres on an encrypted volume/disk; restrict network access to the app only.
 - **Already protected in-app:** API keys and invitation tokens are stored as SHA-256 hashes; Bouncer
   stores **no** OAuth access/refresh tokens. PII (`email`) is **encrypted at rest** with AES-256-GCM

@@ -37,8 +37,9 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: bouncer
-      POSTGRES_PASSWORD: bouncer
+      POSTGRES_PASSWORD: <openssl rand -hex 24>   # same value in DATABASE_URL below
       POSTGRES_DB: bouncer
+    # No `ports:` here on purpose — only the bouncer service needs to reach the database.
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -51,7 +52,7 @@ services:
     ports:
       - "80:3000"          # browse http://localhost
     environment:
-      DATABASE_URL: postgresql://bouncer:bouncer@postgres:5432/bouncer
+      DATABASE_URL: postgresql://bouncer:<the POSTGRES_PASSWORD above>@postgres:5432/bouncer
       FRONTEND_URL: http://localhost
       NODE_ENV: production
       SESSION_SECRET: <openssl rand -base64 48>
@@ -81,6 +82,8 @@ volumes:
   postgres_data:
 ```
 
+Use a strong, URL-safe `POSTGRES_PASSWORD` (the hex from `openssl rand -hex 24` is) — never a shared default like `bouncer` — and don't publish the postgres port: if you need it from the host, bind it to loopback only (`"127.0.0.1:5432:5432"`), because Docker's published ports bypass host firewalls.
+
 Start the stack: `docker compose up -d`, then open `http://localhost` and sign in via OAuth. The first sign-in matching `ADMIN_ALLOWED_EMAILS` becomes the global administrator.
 
 Database migrations are applied automatically when the container starts (the image carries its own migration runner, not the Prisma CLI, and records them in Prisma's `_prisma_migrations` table). Concurrent replicas take turns via a Postgres advisory lock. To manage migrations yourself instead, set `MIGRATE_ON_START=false`.
@@ -92,7 +95,7 @@ Clone the repo, then:
 1. Copy `backend/.env.example` to `backend/.env` and fill in the secrets (see the [OAuth provider setup](#oauth-provider-setup) section — at least one provider must be configured to sign in).
 2. Generate a `SESSION_SECRET` (required, ≥32 chars): `openssl rand -base64 48`
 3. Generate an `ENCRYPTION_KEY` (required, encrypts user emails at rest): `openssl rand -base64 32`, and set `ADMIN_ALLOWED_EMAILS` (required) to the email you will sign in with. Bouncer refuses to start without these in any `NODE_ENV`.
-4. Bring up Postgres + Bouncer (builds the image locally): `bash bash-scripts/runBouncer.sh`
+4. Bring up Postgres + Bouncer (builds the image locally): `bash bash-scripts/runBouncer.sh`. If `backend/.env` doesn't exist yet, it is generated with a random `SESSION_SECRET`, `ENCRYPTION_KEY` and `POSTGRES_PASSWORD` (already filled into `DATABASE_URL`). Postgres is published on `127.0.0.1:5432` only — reachable from this machine, not from the network.
 5. Open `http://localhost` in a browser. The first OAuth sign-in matching `ADMIN_ALLOWED_EMAILS` becomes the global admin.
 
 To stop: `bash bash-scripts/stopBouncer.sh` (preserves the Postgres volume). Use `--purge` to also drop the volume and locally-built images.
