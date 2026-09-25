@@ -88,11 +88,27 @@ describe('GET /access', () => {
     expect(res.body.application.customId).toBe('my-app')
   })
 
-  it('uses findFirst when provider is not specified', async () => {
-    pu.findFirst.mockResolvedValue(mockUser)
+  it('looks the user up by sub and provider together', async () => {
+    pu.findUnique.mockResolvedValue(mockUser)
     pur.findUnique.mockResolvedValue(activeUserRole)
+    await request(makeApp()).get('/access?sub=123&provider=google')
+    expect(pu.findUnique).toHaveBeenCalledWith({ where: { sub_provider: { sub: '123', provider: 'google' } } })
+  })
+
+  // B-06. A sub is only unique per provider. Without one, the route used to answer for whichever
+  // user with that sub the database returned first — possibly a different person than the app
+  // signed in, holding a different role.
+  it('returns 400 when provider is missing, without looking anyone up', async () => {
     const res = await request(makeApp()).get('/access?sub=123')
-    expect(res.status).toBe(200)
-    expect(pu.findFirst).toHaveBeenCalledWith({ where: { sub: '123' } })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('validation_error')
+    expect(pu.findUnique).not.toHaveBeenCalled()
+    expect(pu.findFirst).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when provider is an empty string', async () => {
+    const res = await request(makeApp()).get('/access?sub=123&provider=')
+    expect(res.status).toBe(400)
+    expect(pu.findFirst).not.toHaveBeenCalled()
   })
 })

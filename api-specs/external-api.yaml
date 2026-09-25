@@ -160,12 +160,12 @@ paths:
     get:
       summary: Check user access
       description: |
-        Checks whether the user identified by `sub` (and optionally `provider`) has
-        an active, non-expired role in the application associated with the API key.
+        Checks whether the user identified by `sub` + `provider` has an active,
+        non-expired role in the application associated with the API key.
 
         Possible outcomes:
         - **200** — user has an active role → returns role and application details.
-        - **400** — query validation failed (e.g. `sub` missing or empty).
+        - **400** — query validation failed (`sub` or `provider` missing or empty).
         - **401** — API key is missing or invalid.
         - **403** — user has a role but it is inactive or expired.
         - **404** — user not found, or user has no role in this application.
@@ -179,12 +179,14 @@ paths:
           example: "109876543210"
         - in: query
           name: provider
-          required: false
+          required: true
           schema:
             type: string
           description: |
-            OAuth provider name (e.g. `google`, `microsoft`, `apple`).
-            Required only when the same `sub` exists across multiple providers.
+            The provider the user signed in with (`google`, `microsoft`, `github` or
+            `linkedin`). Always required: a `sub` is only unique within one provider, and
+            subjects from different providers can collide, so `sub` alone could match a
+            different person.
           example: google
       responses:
         '200':
@@ -204,7 +206,7 @@ paths:
                   customId: editor
                   name: Editor
         '400':
-          description: Query parameters failed validation (e.g. `sub` missing or empty)
+          description: Query parameters failed validation (`sub` or `provider` missing or empty)
           content:
             application/json:
               schema:

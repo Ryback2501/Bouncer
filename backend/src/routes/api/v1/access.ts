@@ -7,9 +7,12 @@ import { asyncHandler } from "../../../lib/asyncHandler";
 
 const router = Router();
 
+// `provider` is required: a sub is only unique per provider, and numeric subjects from different
+// providers can collide. Resolving by sub alone could answer for a different person than the one
+// the app signed in, handing them that person's role (B-06).
 const accessQuerySchema = z.object({
   sub: z.string().min(1),
-  provider: z.string().optional(),
+  provider: z.string().min(1),
 });
 
 router.get("/access", apiKeyAuth, validateQuery(accessQuerySchema), asyncHandler(async (req: Request, res: Response) => {
@@ -17,9 +20,7 @@ router.get("/access", apiKeyAuth, validateQuery(accessQuerySchema), asyncHandler
 
   const application = req.bouncerApp!;
 
-  const user = provider
-    ? await prisma.user.findUnique({ where: { sub_provider: { sub, provider } } })
-    : await prisma.user.findFirst({ where: { sub } });
+  const user = await prisma.user.findUnique({ where: { sub_provider: { sub, provider } } });
 
   if (!user) {
     res.status(404).json({ error: "user_not_found" });
