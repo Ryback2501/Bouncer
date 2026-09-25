@@ -129,3 +129,41 @@ describe('GET /api/v1/access — full flow integration', () => {
     expect(res.body.error).toBe('api_key_expired')
   })
 })
+
+// B-06. A sub is only unique per provider. Two different people share `${PREFIX}-sub` here: the
+// Google user holds a role in this app, the GitHub user does not. The answer must always be about
+// the person the app actually signed in — never "whichever user with that sub comes back first".
+describe('GET /api/v1/access — the same sub under two providers', () => {
+  let githubUserId: string
+
+  beforeAll(async () => {
+    githubUserId = (await prisma.user.create({
+      data: { name: 'Same Sub, Other Person', sub: `${PREFIX}-sub`, provider: 'github' },
+    })).id
+  })
+
+  afterAll(async () => {
+    await prisma.user.deleteMany({ where: { id: githubUserId } })
+  })
+
+  const ask = (query: Record<string, string>) =>
+    request(app).get('/api/v1/access').query(query).set('Authorization', `Bearer ${rawApiKey}`)
+
+  it('answers for the GitHub user when asked about GitHub: no role here (404)', async () => {
+    const res = await ask({ sub: `${PREFIX}-sub`, provider: 'github' })
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe('user_not_found')
+  })
+
+  it('answers for the Google user when asked about Google: their role (200)', async () => {
+    const res = await ask({ sub: `${PREFIX}-sub`, provider: 'google' })
+    expect(res.status).toBe(200)
+    expect(res.body.role.id).toBe(roleId)
+  })
+
+  it('refuses to guess when no provider is given (400)', async () => {
+    const res = await ask({ sub: `${PREFIX}-sub` })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('validation_error')
+  })
+})
