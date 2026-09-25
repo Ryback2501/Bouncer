@@ -10,3 +10,5 @@ process.env.MIGRATE_ON_START = 'false'
 delete process.env.STATIC_DIR
 // Deterministic 32-byte key so the PII-encryption extension is exercised in tests.
 process.env.ENCRYPTION_KEY = Buffer.from('0123456789abcdef0123456789abcdef').toString('base64')
+// Required in every NODE_ENV (B-07). Only gates the first-admin bootstrap; tests never rely on it.
+process.env.ADMIN_ALLOWED_EMAILS = 'admin@test.com'

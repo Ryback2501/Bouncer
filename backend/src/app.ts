@@ -11,6 +11,7 @@ import { createHash } from "crypto";
 import path from "path";
 import { Pool } from "pg";
 import { config } from "./config";
+import { isHttpsOrigin, trustProxySetting } from "./lib/securityPolicy";
 import logger from "./lib/logger";
 import { redactReq, redactRes } from "./lib/httpLogSerializers";
 import authRouter from "./routes/auth";
@@ -28,16 +29,9 @@ export function createApp() {
 
   // ── Reverse proxy ───────────────────────────────────────────────────────────
   // Required behind a TLS-terminating proxy so `secure` cookies are set and the real
-  // client IP is used for rate-limiting. TRUST_PROXY overrides; defaults on in production.
-  if (config.TRUST_PROXY !== undefined) {
-    const tp = config.TRUST_PROXY;
-    app.set(
-      "trust proxy",
-      tp === "true" ? true : tp === "false" ? false : /^\d+$/.test(tp) ? Number(tp) : tp
-    );
-  } else if (config.NODE_ENV === "production") {
-    app.set("trust proxy", 1);
-  }
+  // client IP is used for rate-limiting. TRUST_PROXY overrides; otherwise one hop is trusted
+  // exactly when FRONTEND_URL is https (lib/securityPolicy.ts).
+  app.set("trust proxy", trustProxySetting(config.TRUST_PROXY, config.FRONTEND_URL));
 
   // ── Request logging ───────────────────────────────────────────────────────
   // Serializers strip credentials from the logged URL, query and Location header: invitation
@@ -92,7 +86,6 @@ export function createApp() {
     max: 20,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => config.NODE_ENV === "test",
   });
 
   // ── Per-API-key limiter for the external API (/api/v1/*) ──────────────────
@@ -103,7 +96,6 @@ export function createApp() {
     max: 300,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => config.NODE_ENV === "test",
     validate: false,
     keyGenerator: (req) => {
       const auth = req.headers.authorization;
@@ -133,7 +125,7 @@ export function createApp() {
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: config.NODE_ENV === "production",
+        secure: isHttpsOrigin(config.FRONTEND_URL),
         httpOnly: true,
         sameSite: "lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,

@@ -25,32 +25,20 @@ describe('errorHandler', () => {
     vi.mocked(logger.error).mockClear()
   })
   afterEach(() => vi.restoreAllMocks())
-  it('returns 500 with error message for Error instances', () => {
+  // B-07. Internal error text (it can carry DB or implementation details) stays out of client
+  // responses by default, whatever NODE_ENV says. The setup runs as NODE_ENV=test, where it used
+  // to be echoed.
+  it('returns a generic 500 body with no internal message by default', () => {
     const res = makeRes()
-    errorHandler(new Error('Something went wrong'), req, res, next)
+    errorHandler(new Error('secret DB connection string leaked here'), req, res, next)
     expect((res.status as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(500)
-    expect((res.json as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith({
-      error: 'internal_error',
-      message: 'Something went wrong',
-    })
+    expect((res.json as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith({ error: 'internal_error' })
   })
 
-  it('returns generic message for non-Error values', () => {
+  it('returns the same generic body for non-Error values', () => {
     const res = makeRes()
     errorHandler('a plain string', req, res, next)
-    expect((res.json as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith({
-      error: 'internal_error',
-      message: 'Internal server error',
-    })
-  })
-
-  it('returns generic message for null', () => {
-    const res = makeRes()
-    errorHandler(null, req, res, next)
-    expect((res.json as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith({
-      error: 'internal_error',
-      message: 'Internal server error',
-    })
+    expect((res.json as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith({ error: 'internal_error' })
   })
 
   // `url` is logged as a top-level key here, outside pino-http's req serializer — so it needs

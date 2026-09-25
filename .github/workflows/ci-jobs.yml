@@ -206,12 +206,20 @@ jobs:
       SESSION_SECRET: ci-session-secret-minimum-sixteen-chars
       FRONTEND_URL: http://localhost:3000
       NODE_ENV: test
+      # Required in every NODE_ENV since B-07 (with ENCRYPTION_KEY, generated in the first step).
+      # This job starts the real backend, which unlike the vitest jobs does not load
+      # src/__tests__/setup.ts.
+      ADMIN_ALLOWED_EMAILS: ci@example.com
       # Backend serves the built SPA from this path. The same single-origin setup that
       # ships in the production Docker image — keeps e2e exercising what users hit.
       STATIC_DIR: ${{ github.workspace }}/frontend/dist
 
     steps:
       - uses: actions/checkout@v6.0.2
+
+      # Throwaway key, generated per run rather than committed.
+      - name: Generate ENCRYPTION_KEY
+        run: echo "ENCRYPTION_KEY=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
 
       - name: Install backend dependencies
         working-directory: backend
@@ -280,15 +288,18 @@ jobs:
 
       - uses: docker/setup-buildx-action@v4
 
+      # Production mode, so the smoke test runs the image the way it ships. The values are fake;
+      # no OAuth provider is needed for these checks (a missing one only logs a warning).
       - name: Write CI-safe backend/.env.docker
         run: |
           {
-            echo "NODE_ENV=test"
+            echo "NODE_ENV=production"
             echo "PORT=3000"
             echo "FRONTEND_URL=http://localhost"
+            echo "TRUST_PROXY=false"
             echo "SESSION_SECRET=$(openssl rand -base64 48 | tr -d '\n')"
             echo "ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -d '\n')"
-            echo "ADMIN_ALLOWED_EMAILS="
+            echo "ADMIN_ALLOWED_EMAILS=ci@example.com"
             echo "POSTGRES_USER=${POSTGRES_USER}"
             echo "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
             echo "POSTGRES_DB=${POSTGRES_DB}"

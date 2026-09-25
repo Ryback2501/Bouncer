@@ -90,10 +90,10 @@ Database migrations are applied automatically when the container starts (the ima
 Clone the repo, then:
 
 1. Copy `backend/.env.example` to `backend/.env` and fill in the secrets (see the [OAuth provider setup](#oauth-provider-setup) section — at least one provider must be configured to sign in).
-2. Generate a `SESSION_SECRET` (≥32 chars in production): `openssl rand -base64 48`
-3. Generate an `ENCRYPTION_KEY` (required in production, encrypts user emails at rest): `openssl rand -base64 32`
+2. Generate a `SESSION_SECRET` (required, ≥32 chars): `openssl rand -base64 48`
+3. Generate an `ENCRYPTION_KEY` (required, encrypts user emails at rest): `openssl rand -base64 32`, and set `ADMIN_ALLOWED_EMAILS` (required) to the email you will sign in with. Bouncer refuses to start without these in any `NODE_ENV`.
 4. Bring up Postgres + Bouncer (builds the image locally): `bash bash-scripts/runBouncer.sh`
-5. Open `http://localhost` in a browser. The first OAuth sign-in becomes the global admin.
+5. Open `http://localhost` in a browser. The first OAuth sign-in matching `ADMIN_ALLOWED_EMAILS` becomes the global admin.
 
 To stop: `bash bash-scripts/stopBouncer.sh` (preserves the Postgres volume). Use `--purge` to also drop the volume and locally-built images.
 

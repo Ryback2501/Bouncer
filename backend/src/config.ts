@@ -11,7 +11,7 @@ const csvEmails = z
       .filter(Boolean)
   );
 
-const schema = z
+export const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
     PORT: z.coerce.number().default(3000),
@@ -19,13 +19,20 @@ const schema = z
     SESSION_SECRET: z.string().min(16),
     FRONTEND_URL: z.string().url(),
     // Express "trust proxy" setting. Accepts a boolean, an integer hop count, or a
-    // subnet/IP list (see Express docs). Defaults to trusting the first hop in production.
+    // subnet/IP list (see Express docs). Unset/empty: trust one hop iff FRONTEND_URL is https
+    // (see lib/securityPolicy.ts).
     TRUST_PROXY: z.string().optional(),
-    // Allowlist of emails permitted to bootstrap the first global admin. Required in production.
+    // Allowlist of emails permitted to bootstrap the first global admin. Required.
     ADMIN_ALLOWED_EMAILS: csvEmails,
-    // Base64-encoded 32-byte key for encrypting PII (email) at rest. Required in production.
+    // Base64-encoded 32-byte key for encrypting PII (email) at rest. Required.
     // Generate: openssl rand -base64 32
     ENCRYPTION_KEY: z.string().optional(),
+    // Local debugging only: put the internal error text into 500 responses. Off by default; no
+    // NODE_ENV value turns it on.
+    EXPOSE_ERROR_DETAILS: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((v) => v === "true"),
     // Filesystem path of the built SPA's `dist/` directory. When set, Express serves it as
     // static assets plus an HTML-accepting GET fallback to index.html (SPA client-side
     // routing). The production Docker image sets this to /app/public; leave unset to keep
@@ -57,7 +64,8 @@ const schema = z
     LINKEDIN_CLIENT_SECRET: z.string().optional(),
     LINKEDIN_CALLBACK_URL: z.string().optional(),
   })
-  // Production hardening: fail closed on weak/incomplete config.
+  // Fail closed on weak/incomplete config — in every NODE_ENV. These used to apply only in
+  // production, and the image is routinely run as development/test (B-07).
   .superRefine((env, ctx) => {
     // Validate the encryption key shape whenever it is provided (dev or prod).
     if (env.ENCRYPTION_KEY !== undefined) {
@@ -76,13 +84,11 @@ const schema = z
       }
     }
 
-    if (env.NODE_ENV !== "production") return;
-
     if (!env.ENCRYPTION_KEY) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["ENCRYPTION_KEY"],
-        message: "must be set in production to encrypt PII (email) at rest",
+        message: "must be set to encrypt PII (email) at rest (generate: openssl rand -base64 32)",
       });
     }
 
@@ -90,20 +96,7 @@ const schema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["SESSION_SECRET"],
-        message: "must be at least 32 characters in production",
-      });
-    }
-
-    const hasProvider =
-      (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) ||
-      (env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET) ||
-      (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) ||
-      (env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET);
-    if (!hasProvider) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["GOOGLE_CLIENT_ID"],
-        message: "at least one OAuth provider (client id + secret) must be configured in production",
+        message: "must be at least 32 characters (generate: openssl rand -base64 48)",
       });
     }
 
@@ -111,12 +104,12 @@ const schema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["ADMIN_ALLOWED_EMAILS"],
-        message: "must be set in production to control who can bootstrap the global admin",
+        message: "must be set to control who can bootstrap the global admin",
       });
     }
   });
 
-const parsed = schema.safeParse(process.env);
+const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
   console.error("❌ Invalid environment variables:");
   for (const [field, issues] of Object.entries(parsed.error.flatten().fieldErrors)) {
@@ -126,6 +119,17 @@ if (!parsed.success) {
 }
 
 export const config = parsed.data;
+
+// Without a provider nobody can sign in. That is a usability problem, not a security one, so it
+// warns rather than refusing to start (the test suites run without providers).
+const hasProvider =
+  (config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET) ||
+  (config.MICROSOFT_CLIENT_ID && config.MICROSOFT_CLIENT_SECRET) ||
+  (config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET) ||
+  (config.LINKEDIN_CLIENT_ID && config.LINKEDIN_CLIENT_SECRET);
+if (!hasProvider && config.NODE_ENV !== "test") {
+  console.warn("⚠️  No OAuth provider (client id + secret) is configured; nobody will be able to sign in.");
+}
 
 // Advisory: encrypted transport to the database is strongly recommended in production.
 if (config.NODE_ENV === "production" && !/sslmode=/i.test(config.DATABASE_URL)) {

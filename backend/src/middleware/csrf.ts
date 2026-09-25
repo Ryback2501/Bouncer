@@ -1,5 +1,6 @@
 import { doubleCsrf } from "csrf-csrf";
 import { config } from "../config";
+import { isHttpsOrigin } from "../lib/securityPolicy";
 
 export const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   getSecret: () => config.SESSION_SECRET,
@@ -8,7 +9,7 @@ export const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   cookieOptions: {
     sameSite: "strict",
     path: "/",
-    secure: config.NODE_ENV === "production",
+    secure: isHttpsOrigin(config.FRONTEND_URL),
     httpOnly: true,
   },
   getCsrfTokenFromRequest: (req) => req.headers["x-csrf-token"] as string,
