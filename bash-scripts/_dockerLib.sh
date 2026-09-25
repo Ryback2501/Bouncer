@@ -34,6 +34,8 @@ ensure_env_file() {
       { print }
     ' "$ENV_EXAMPLE" > "$ENV_FILE"
   chmod 600 "$ENV_FILE"
+  # Required in every NODE_ENV; Bouncer refuses to start while it is empty.
+  echo "NOTE: set ADMIN_ALLOWED_EMAILS in $ENV_FILE to the email you will sign in with." >&2
 }
 
 # Materialize backend/.env → backend/.env.docker, normalizing each VALUE so compose

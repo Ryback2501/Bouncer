@@ -15,29 +15,44 @@ built-in protections and what an operator must do to deploy it safely.
   unlocks one — OAuth is the only way to obtain a portal session. The e2e suite seeds a session
   row directly against its own database instead of asking the server for one.
 
-## Required production configuration (fails closed)
+## Required configuration (fails closed)
 
-`src/config.ts` validates the environment at startup and **refuses to boot** in
-`NODE_ENV=production` unless:
+`src/config.ts` validates the environment at startup and **refuses to boot** — in every
+`NODE_ENV`, not only `production` — unless:
 
 | Variable | Requirement |
 |---|---|
 | `SESSION_SECRET` | ≥ 32 chars. Generate: `openssl rand -base64 48`. |
 | `ADMIN_ALLOWED_EMAILS` | Non-empty. Comma-separated emails permitted to **bootstrap the first global admin** — closes the "first OAuth sign-in wins admin" race. |
-| One OAuth provider | At least one `*_CLIENT_ID` + `*_CLIENT_SECRET` pair. |
 | `ENCRYPTION_KEY` | Base64-encoded 32-byte key for encrypting PII at rest. Generate: `openssl rand -base64 32`. |
-| `DATABASE_URL` | Should include `sslmode=require` (warns if absent). |
 
-See `backend/.env.example` for the full list.
+It also warns (without refusing) when no OAuth provider (`*_CLIENT_ID` + `*_CLIENT_SECRET`) is
+configured — nobody could sign in — and, in `production`, when `DATABASE_URL` has no
+`sslmode=require`.
+
+**No security behaviour depends on `NODE_ENV`.** The image is routinely run as `development` or
+`test`, so each protection follows the deployment itself instead: cookies and proxy trust follow
+`FRONTEND_URL`, rate limits are always on, and error details are hidden unless explicitly
+exposed. `NODE_ENV` only changes the log format (pretty unless `production`) and the sslmode
+advisory. See `backend/.env.example` for the full list.
 
 ## Network / reverse proxy
 
 - Terminate TLS at a reverse proxy / ingress and route `/`, `/api`, `/auth`, `/admin` to the right
   service (the SPA uses same-origin relative URLs).
-- Set **`TRUST_PROXY`** (defaults to `1` in production) so `secure` session cookies are issued and
-  client IPs are correct for rate-limiting.
-- Session cookies are `httpOnly`, `sameSite=lax`, and `secure` in production. Passport regenerates
-  the session on login (anti session-fixation). Logout is `POST /auth/logout`.
+- **`TRUST_PROXY`**: when unset (or empty), one proxy hop is trusted exactly when `FRONTEND_URL` is
+  `https://` — Bouncer never terminates TLS itself, so an https origin means a TLS proxy is in
+  front. With an `http://` origin nothing is trusted, so clients cannot choose their own IP via
+  `X-Forwarded-For`. Set it explicitly for other topologies (e.g. `2` for two proxies,
+  `false` to trust none). Behind a proxy, do not also expose the backend port directly.
+  **Plain-http proxy** (e.g. on a LAN, `FRONTEND_URL=http://bouncer.lan`): set `TRUST_PROXY=1`, or
+  every user shares the proxy's IP and therefore one rate-limit bucket. Startup warns about an
+  http origin that is not localhost while `TRUST_PROXY` is unset.
+- Session and CSRF cookies are `httpOnly` and `sameSite` (`lax` / `strict`), and `Secure` exactly
+  when `FRONTEND_URL` is `https://`. Passport regenerates the session on login (anti
+  session-fixation). Logout is `POST /auth/logout`.
+- Rate limits (all routes, stricter on `/auth` and per API key on `/api/v1`) are always on; there
+  is no mode that switches them off.
 
 ## Database hardening (data at rest)
 
@@ -108,7 +123,8 @@ See `backend/.env.example` for the full list.
   sanitised before they are written — the logged `url`, the parsed `query`, and the `Location`
   response header all have the values of `invite`, `code`, `state` and `nonce` blanked, in both the
   access log and the error handler. Parameter names survive so a log line is still diagnostic.
-  Internal error messages are never returned to clients in production.
+  Internal error messages are never returned to clients, unless `EXPOSE_ERROR_DETAILS=true` is
+  set explicitly — for local debugging only; never set it on a reachable deployment.
 
 ## Known / accepted
 
