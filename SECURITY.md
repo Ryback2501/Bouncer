@@ -45,6 +45,9 @@ advisory. See `backend/.env.example` for the full list.
   front. With an `http://` origin nothing is trusted, so clients cannot choose their own IP via
   `X-Forwarded-For`. Set it explicitly for other topologies (e.g. `2` for two proxies,
   `false` to trust none). Behind a proxy, do not also expose the backend port directly.
+  **Plain-http proxy** (e.g. on a LAN, `FRONTEND_URL=http://bouncer.lan`): set `TRUST_PROXY=1`, or
+  every user shares the proxy's IP and therefore one rate-limit bucket. Startup warns about an
+  http origin that is not localhost while `TRUST_PROXY` is unset.
 - Session and CSRF cookies are `httpOnly` and `sameSite` (`lax` / `strict`), and `Secure` exactly
   when `FRONTEND_URL` is `https://`. Passport regenerates the session on login (anti
   session-fixation). Logout is `POST /auth/logout`.

@@ -43,6 +43,13 @@ describe('startup checks apply in every NODE_ENV', () => {
     expect(envSchema.safeParse({ ...valid, NODE_ENV: 'production' }).success).toBe(true)
   })
 
+  // A debugging switch must not be able to stop the app: an uncommented-but-blank line reaches
+  // the container as an empty string.
+  it('treats an empty EXPOSE_ERROR_DETAILS as unset, and ignores case', () => {
+    expect(envSchema.parse({ ...valid, EXPOSE_ERROR_DETAILS: '' }).EXPOSE_ERROR_DETAILS).toBe(false)
+    expect(envSchema.parse({ ...valid, EXPOSE_ERROR_DETAILS: 'TRUE' }).EXPOSE_ERROR_DETAILS).toBe(true)
+  })
+
   it('parses EXPOSE_ERROR_DETAILS, off by default', () => {
     expect(envSchema.parse(valid).EXPOSE_ERROR_DETAILS).toBe(false)
     expect(envSchema.parse({ ...valid, EXPOSE_ERROR_DETAILS: 'true' }).EXPOSE_ERROR_DETAILS).toBe(true)

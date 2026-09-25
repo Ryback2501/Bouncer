@@ -20,3 +20,19 @@ export function trustProxySetting(trustProxy: string | undefined, origin: string
   if (tp === "false") return false;
   return /^\d+$/.test(tp) ? Number(tp) : tp;
 }
+
+/**
+ * Startup advice for the one setup the default can get wrong: an http origin that is not
+ * localhost, with TRUST_PROXY unset. That is usually a plain-http reverse proxy (e.g. on a LAN).
+ * Without TRUST_PROXY every user then shares the proxy's IP, and so one rate-limit bucket.
+ */
+export function missingTrustProxyWarning(trustProxy: string | undefined, origin: string): string | null {
+  if (trustProxy?.trim() || isHttpsOrigin(origin)) return null;
+  const host = new URL(origin).hostname;
+  if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return null;
+  return (
+    `FRONTEND_URL is http://${host} and TRUST_PROXY is unset, so no proxy is trusted. If a reverse ` +
+    "proxy is in front of Bouncer, set TRUST_PROXY=1 or every user shares the proxy's rate limit; " +
+    "otherwise set TRUST_PROXY=false to silence this."
+  );
+}

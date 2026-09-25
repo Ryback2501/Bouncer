@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { missingTrustProxyWarning } from "./lib/securityPolicy";
 
 // Comma-separated email list → normalized lowercase array.
 const csvEmails = z
@@ -29,10 +30,14 @@ export const envSchema = z
     ENCRYPTION_KEY: z.string().optional(),
     // Local debugging only: put the internal error text into 500 responses. Off by default; no
     // NODE_ENV value turns it on.
-    EXPOSE_ERROR_DETAILS: z
-      .enum(["true", "false"])
-      .default("false")
-      .transform((v) => v === "true"),
+    // Empty counts as unset and case is ignored: a debugging switch must never stop the app.
+    EXPOSE_ERROR_DETAILS: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() !== "" ? v.trim().toLowerCase() : undefined),
+      z
+        .enum(["true", "false"])
+        .default("false")
+        .transform((v) => v === "true")
+    ),
     // Filesystem path of the built SPA's `dist/` directory. When set, Express serves it as
     // static assets plus an HTML-accepting GET fallback to index.html (SPA client-side
     // routing). The production Docker image sets this to /app/public; leave unset to keep
@@ -130,6 +135,9 @@ const hasProvider =
 if (!hasProvider && config.NODE_ENV !== "test") {
   console.warn("⚠️  No OAuth provider (client id + secret) is configured; nobody will be able to sign in.");
 }
+
+const trustProxyWarning = missingTrustProxyWarning(config.TRUST_PROXY, config.FRONTEND_URL);
+if (trustProxyWarning) console.warn(`⚠️  ${trustProxyWarning}`);
 
 // Advisory: encrypted transport to the database is strongly recommended in production.
 if (config.NODE_ENV === "production" && !/sslmode=/i.test(config.DATABASE_URL)) {
