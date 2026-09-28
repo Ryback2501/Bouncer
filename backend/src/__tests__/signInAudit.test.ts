@@ -31,10 +31,11 @@ vi.mock('../prisma', () => ({
 vi.mock('../services/auditService', async (orig) => ({
   ...(await orig<typeof import('../services/auditService')>()),
   recordAudit: vi.fn().mockResolvedValue(undefined),
+  logAuditOnly: vi.fn(),
 }))
 
 import { prisma } from '../prisma'
-import { recordAudit } from '../services/auditService'
+import { recordAudit, logAuditOnly } from '../services/auditService'
 import { findOrCreateUser } from '../passport'
 import { finishAuth, logoutHandler } from '../routes/auth'
 
@@ -42,6 +43,7 @@ const pu = prisma.user as unknown as Record<string, ReturnType<typeof vi.fn>>
 const pur = prisma.userRole as unknown as Record<string, ReturnType<typeof vi.fn>>
 const ptx = prisma.$transaction as unknown as ReturnType<typeof vi.fn>
 const audit = vi.mocked(recordAudit)
+const logOnly = vi.mocked(logAuditOnly)
 
 const IP = '203.0.113.9'
 const profile = { sub: 'g-123', provider: 'google', name: 'Pat', email: 'pat@example.com' }
@@ -74,11 +76,13 @@ describe('findOrCreateUser records its decision', () => {
     expectNoEmail()
   })
 
-  it('rejected: not on the bootstrap allowlist', async () => {
+  // A stranger can trigger these at will (any OAuth account), so they are log lines, not rows.
+  it('rejected: not on the bootstrap allowlist (log only)', async () => {
     pu.count.mockResolvedValue(0)
     mockConfig.ADMIN_ALLOWED_EMAILS = ['someone-else@example.com']
     expect(await findOrCreateUser(profile, undefined, IP)).toBeNull()
-    expect(audit).toHaveBeenCalledWith({
+    expect(audit).not.toHaveBeenCalled()
+    expect(logOnly).toHaveBeenCalledWith({
       action: 'auth.login_rejected',
       outcome: 'denied',
       actor: anonymous,
@@ -106,9 +110,10 @@ describe('findOrCreateUser records its decision', () => {
     expect(audit.mock.calls[0][0]).toMatchObject({ outcome: 'denied', details: { reason: 'portal_role_expired' } })
   })
 
-  it('rejected: a stranger once admins exist and there is no invitation', async () => {
+  it('rejected: a stranger once admins exist and there is no invitation (log only)', async () => {
     await findOrCreateUser(profile, undefined, IP)
-    expect(audit).toHaveBeenCalledWith({
+    expect(audit).not.toHaveBeenCalled()
+    expect(logOnly).toHaveBeenCalledWith({
       action: 'auth.login_rejected',
       outcome: 'denied',
       actor: anonymous,
@@ -116,16 +121,17 @@ describe('findOrCreateUser records its decision', () => {
     })
   })
 
-  it('rejected: an unknown, used or expired invitation', async () => {
+  it('rejected: an unknown, used or expired invitation (log only)', async () => {
     ptx.mockImplementation(async (cb: (tx: unknown) => unknown) => cb({ invitation: { findFirst: vi.fn().mockResolvedValue(null) } }))
     expect(await findOrCreateUser(profile, 'rawtoken', IP)).toBeNull()
-    expect(audit).toHaveBeenCalledWith({
+    expect(audit).not.toHaveBeenCalled()
+    expect(logOnly).toHaveBeenCalledWith({
       action: 'auth.login_rejected',
       outcome: 'denied',
       actor: anonymous,
       details: { provider: 'google', sub: 'g-123', reason: 'invalid_invitation' },
     })
-    expect(JSON.stringify(audit.mock.calls)).not.toContain('rawtoken')
+    expect(JSON.stringify(logOnly.mock.calls)).not.toContain('rawtoken')
   })
 
   it('invitation redeemed (after the transaction commits)', async () => {
@@ -169,9 +175,30 @@ describe('the OAuth callback and logout record the session', () => {
     expectNoEmail()
   })
 
+  it('login through an admin invitation is flagged as via invite', async () => {
+    const res = { redirect: vi.fn() } as unknown as Response
+    const req = { user, ip: IP, inviteOutcome: { kind: 'admin', viaInvite: true, redirectUri: null, appCustomId: 'bouncer' } }
+    await finishAuth(req as unknown as Request, res)
+    expect(audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'auth.login', details: { provider: 'google', viaInvite: true } }))
+  })
+
+  it('the invite path of findOrCreateUser reports viaInvite', async () => {
+    const tx = {
+      invitation: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'inv2', applicationId: 'bouncer-app', roleId: 'admin-role', redirectUri: null, application: { customId: 'bouncer' }, role: { customId: 'admin' } }),
+        update: vi.fn(),
+      },
+      user: { upsert: vi.fn().mockResolvedValue({ id: 'u4', name: 'Pat', isGlobalAdmin: false }) },
+      userRole: { upsert: vi.fn(), count: vi.fn() },
+    }
+    ptx.mockImplementation(async (cb: (t: unknown) => unknown) => cb(tx))
+    const result = await findOrCreateUser(profile, 'rawtoken', IP)
+    expect(result?.outcome).toMatchObject({ kind: 'admin', viaInvite: true })
+  })
+
   it('login through an application invitation', async () => {
     const res = { redirect: vi.fn() } as unknown as Response
-    const req = { user, ip: IP, inviteOutcome: { kind: 'app', redirectUri: null, appCustomId: 'shop' }, logout: (cb: (e?: unknown) => void) => cb() }
+    const req = { user, ip: IP, inviteOutcome: { kind: 'app', viaInvite: true, redirectUri: null, appCustomId: 'shop' }, logout: (cb: (e?: unknown) => void) => cb() }
     await finishAuth(req as unknown as Request, res)
     expect(audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'auth.login', details: { provider: 'google', viaInvite: true, application: 'shop' } }))
   })

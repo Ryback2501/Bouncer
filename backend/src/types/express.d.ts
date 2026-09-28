@@ -13,7 +13,7 @@ declare global {
       // admin invites/logins keep a portal session; app invites are logged out + redirected.
       // Lives on the request (not the session) so it survives passport's session regeneration
       // on login (the session-fixation defense in passport ≥0.6).
-      inviteOutcome?: { kind: "admin" | "app"; redirectUri: string | null; appCustomId: string };
+      inviteOutcome?: { kind: "admin" | "app"; viaInvite: boolean; redirectUri: string | null; appCustomId: string };
     }
   }
 }

@@ -7,7 +7,7 @@ import { setupGitHubStrategy } from "./githubStrategy";
 import { setupLinkedInStrategy } from "./linkedinStrategy";
 import { ensureBouncerDefaults, BOUNCER_APP_CUSTOM_ID, BOUNCER_ADMIN_ROLE_CUSTOM_ID } from "../lib/bouncerDefaults";
 import { config } from "../config";
-import { recordAudit, type AuditActor } from "../services/auditService";
+import { recordAudit, logAuditOnly, type AuditActor } from "../services/auditService";
 
 export async function configurePassport() {
   await ensureBouncerDefaults();
@@ -44,6 +44,8 @@ export async function configurePassport() {
 // admin invite); "app" means an external-app invite — log the user out and send them to the app.
 export interface AcceptOutcome {
   kind: "admin" | "app";
+  /** Signed in by accepting an invitation (admin or app), as opposed to an ordinary admin login. */
+  viaInvite: boolean;
   redirectUri: string | null;
   appCustomId: string;
 }
@@ -61,17 +63,25 @@ function userActor(user: { id: string; name: string | null }, ip?: string | null
   return { type: "user", id: user.id, label: user.name ?? null, ip: ip ?? null };
 }
 
-function auditRejected(
+// A rejected known user (no or expired portal role) is stored. A rejected stranger is log-only:
+// anyone with an OAuth account can trigger that at will, and storing it would let them grow the
+// audit table on demand — the same rule as the other unauthenticated rejections.
+async function auditRejected(
   reason: string,
   profile: SignInProfile,
   ip?: string | null,
   user?: { id: string; name: string | null }
 ): Promise<void> {
-  return recordAudit({
+  const details = { provider: profile.provider, sub: profile.sub, reason };
+  if (user) {
+    await recordAudit({ action: "auth.login_rejected", outcome: "denied", actor: userActor(user, ip), details });
+    return;
+  }
+  logAuditOnly({
     action: "auth.login_rejected",
     outcome: "denied",
-    actor: user ? userActor(user, ip) : { type: "anonymous", id: null, label: null, ip: ip ?? null },
-    details: { provider: profile.provider, sub: profile.sub, reason },
+    actor: { type: "anonymous", id: null, label: null, ip: ip ?? null },
+    details,
   });
 }
 
@@ -147,6 +157,7 @@ export async function findOrCreateUser(
         user,
         outcome: {
           kind: isAdminInvite || keptRoleUsable ? "admin" : "app",
+          viaInvite: true,
           redirectUri: invitation.redirectUri,
           appCustomId: invitation.application.customId,
         },
@@ -187,7 +198,7 @@ export async function findOrCreateUser(
       where: { id: existing.id },
       data: { name: profile.name, email: profile.email },
     });
-    return { user, outcome: { kind: "admin", redirectUri: null, appCustomId: bouncerApp.customId } };
+    return { user, outcome: { kind: "admin", viaInvite: false, redirectUri: null, appCustomId: bouncerApp.customId } };
   }
 
   // ── No invite, no user: bootstrap the very first user as global admin ────────
@@ -226,7 +237,7 @@ export async function findOrCreateUser(
       target: { type: "user", id: user.id, label: user.name ?? null },
       details: { provider: profile.provider },
     });
-    return { user, outcome: { kind: "admin", redirectUri: null, appCustomId: bouncerApp.customId } };
+    return { user, outcome: { kind: "admin", viaInvite: false, redirectUri: null, appCustomId: bouncerApp.customId } };
   }
 
   // Admins exist, no invitation token — reject (non-invited, non-admin sign-in).

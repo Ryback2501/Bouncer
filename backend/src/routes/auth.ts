@@ -34,7 +34,7 @@ export async function finishAuth(req: Request, res: Response) {
       actor: auditActor(req),
       details: {
         provider: req.user.provider,
-        viaInvite: outcome?.kind === "app",
+        viaInvite: outcome?.viaInvite ?? false,
         ...(outcome?.kind === "app" && { application: outcome.appCustomId }),
       },
     });
