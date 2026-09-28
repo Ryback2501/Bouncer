@@ -35,7 +35,22 @@ describe('startup checks apply in every NODE_ENV', () => {
     it(`requires ADMIN_ALLOWED_EMAILS in ${mode}`, () => {
       expect(failingFields({ ...valid, NODE_ENV: mode, ADMIN_ALLOWED_EMAILS: '' })).toContain('ADMIN_ALLOWED_EMAILS')
     })
+
+    // B-09: `true` lets any client pick its own IP via X-Forwarded-For and dodge the rate limits.
+    it(`rejects TRUST_PROXY=true in ${mode}`, () => {
+      expect(failingFields({ ...valid, NODE_ENV: mode, TRUST_PROXY: 'true' })).toContain('TRUST_PROXY')
+    })
   }
+
+  it('rejects a TRUST_PROXY that Express cannot parse', () => {
+    expect(failingFields({ ...valid, TRUST_PROXY: 'bogus' })).toContain('TRUST_PROXY')
+  })
+
+  it('accepts TRUST_PROXY unset, false, a hop count, or a subnet', () => {
+    for (const TRUST_PROXY of [undefined, 'false', '1', '10.0.0.0/8']) {
+      expect(envSchema.safeParse({ ...valid, TRUST_PROXY }).success).toBe(true)
+    }
+  })
 
   // Without a provider nobody can sign in — a usability problem, reported as a startup warning,
   // not a security one. It must not stop the process.

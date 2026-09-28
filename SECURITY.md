@@ -43,8 +43,12 @@ advisory. See `backend/.env.example` for the full list.
 - **`TRUST_PROXY`**: when unset (or empty), one proxy hop is trusted exactly when `FRONTEND_URL` is
   `https://` — Bouncer never terminates TLS itself, so an https origin means a TLS proxy is in
   front. With an `http://` origin nothing is trusted, so clients cannot choose their own IP via
-  `X-Forwarded-For`. Set it explicitly for other topologies (e.g. `2` for two proxies,
-  `false` to trust none). Behind a proxy, do not also expose the backend port directly.
+  `X-Forwarded-For`. Set it explicitly for other topologies (e.g. `2` for two proxies, the
+  proxy's IP/subnet such as `10.0.0.0/8`, or `false` to trust none). The hop count must equal the
+  real number of proxies: a larger one lets clients spoof their IP again. **`true` is rejected at
+  startup** — it trusts every hop, so any client could pick its own IP via `X-Forwarded-For` and get
+  a fresh rate-limit bucket per request; values Express cannot parse are rejected too. Behind a
+  proxy, do not also expose the backend port directly.
   **Plain-http proxy** (e.g. on a LAN, `FRONTEND_URL=http://bouncer.lan`): set `TRUST_PROXY=1`, or
   every user shares the proxy's IP and therefore one rate-limit bucket. Startup warns about an
   http origin that is not localhost while `TRUST_PROXY` is unset.

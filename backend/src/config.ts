@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { missingTrustProxyWarning } from "./lib/securityPolicy";
+import { missingTrustProxyWarning, trustProxyError } from "./lib/securityPolicy";
 
 // Comma-separated email list → normalized lowercase array.
 const csvEmails = z
@@ -19,9 +19,9 @@ export const envSchema = z
     DATABASE_URL: z.string().min(1),
     SESSION_SECRET: z.string().min(16),
     FRONTEND_URL: z.string().url(),
-    // Express "trust proxy" setting. Accepts a boolean, an integer hop count, or a
-    // subnet/IP list (see Express docs). Unset/empty: trust one hop iff FRONTEND_URL is https
-    // (see lib/securityPolicy.ts).
+    // Express "trust proxy" setting: `false`, an integer hop count, or a subnet/IP list (see
+    // Express docs). `true` is rejected (B-09). Unset/empty: trust one hop iff FRONTEND_URL is
+    // https (see lib/securityPolicy.ts).
     TRUST_PROXY: z.string().optional(),
     // Allowlist of emails permitted to bootstrap the first global admin. Required.
     ADMIN_ALLOWED_EMAILS: csvEmails,
@@ -103,6 +103,11 @@ export const envSchema = z
         path: ["SESSION_SECRET"],
         message: "must be at least 32 characters (generate: openssl rand -base64 48)",
       });
+    }
+
+    const trustProxyIssue = trustProxyError(env.TRUST_PROXY);
+    if (trustProxyIssue) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["TRUST_PROXY"], message: trustProxyIssue });
     }
 
     if (env.ADMIN_ALLOWED_EMAILS.length === 0) {
