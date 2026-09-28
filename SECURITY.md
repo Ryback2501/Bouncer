@@ -142,9 +142,8 @@ advisory. See `backend/.env.example` for the full list.
 Security-relevant events are stored in the `AuditEvent` table and shown on the admin **Audit log**
 page (`GET /admin/audit`); each is also a structured log line with `audit: true`.
 
-- **Recorded:** sign-ins (`auth.login`), rejected sign-ins with a reason (`auth.login_rejected`:
-  `not_allowlisted`, `no_portal_role`, `portal_role_expired`, `invalid_invitation`, `not_invited`),
-  the first-admin bootstrap, logout, invitation create / redeem / delete (by an admin or an API key),
+- **Recorded:** sign-ins (`auth.login`, with `viaInvite`), rejected sign-ins of an existing user
+  (`auth.login_rejected`: `no_portal_role`, `portal_role_expired`), the first-admin bootstrap, logout, invitation create / redeem / delete (by an admin or an API key),
   and every admin create / update / delete of applications, roles, users, assignments and API keys.
   Refused protected actions (the Bouncer application, its admin role, the global admin) are
   recorded with outcome `denied`.
@@ -154,8 +153,9 @@ page (`GET /admin/audit`); each is also a structured log line with `audit: true`
 - **Never recorded:** tokens, raw API keys, key hashes, session or CSRF identifiers, OAuth codes, or
   email addresses.
 - **Log only, not stored:** rejections anyone can trigger without credentials — unknown / expired /
-  portal API keys, requests without an admin session, bad CSRF tokens — so the table cannot be grown
-  on demand. Collect the structured logs if you need those.
+  portal API keys, requests without an admin session, bad CSRF tokens, and sign-ins by a stranger
+  (`auth.login_rejected`: `not_invited`, `not_allowlisted`, `invalid_invitation`) — so the table
+  cannot be grown on demand. Collect the structured logs if you need those.
 - **Retention:** `AUDIT_RETENTION_DAYS` (default 90); older events are pruned at startup and daily.
   Rows have no foreign keys, so an event outlives the user, key or application it mentions.
 
