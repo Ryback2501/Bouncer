@@ -39,7 +39,8 @@ export function setupLinkedInStrategy() {
           delete req.session.inviteToken;
           const result = await findOrCreateUser(
             { sub: profile.id, provider: "linkedin", name: profile.displayName ?? "", email },
-            inviteToken
+            inviteToken,
+            req.ip
           );
           if (!result) return done(null, false as unknown as Express.User);
           req.inviteOutcome = result.outcome;

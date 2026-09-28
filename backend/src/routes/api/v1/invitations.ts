@@ -4,6 +4,7 @@ import { customIdField, urlField } from "../../../lib/inputLimits";
 import { apiKeyAuth } from "../../../middleware/apiKeyAuth";
 import { validateBody } from "../../../middleware/validate";
 import { asyncHandler } from "../../../lib/asyncHandler";
+import { auditRequest } from "../../../services/auditService";
 import { isAllowedRedirectUri } from "../../../lib/redirectUri";
 import * as roleService from "../../../services/roleService";
 import * as invitationService from "../../../services/invitationService";
@@ -42,6 +43,8 @@ router.post("/", apiKeyAuth, validateBody(createInvitationSchema), asyncHandler(
     createdByApiKeyLabel: req.bouncerApiKey?.label ?? null,
   });
 
+  // Actor = the API key. Never the invite URL: it carries the token.
+  await auditRequest(req, { action: "invitation.create", target: { type: "invitation", id: invitation.id }, details: { applicationId: application.id, roleId: targetRole.id } });
   res.status(201).json({
     inviteUrl: invitation.inviteUrl,
     expiresAt: invitation.expiresAt,

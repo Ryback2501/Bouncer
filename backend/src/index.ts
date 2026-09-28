@@ -7,6 +7,7 @@ import { prisma } from "./prisma";
 import { configurePassport } from "./passport";
 import logger from "./lib/logger";
 import { runMigrations } from "./lib/migrate";
+import { scheduleAuditPrune } from "./services/auditService";
 
 async function migrate() {
   const client = new Client({ connectionString: config.DATABASE_URL });
@@ -32,6 +33,9 @@ async function main() {
   app.listen(config.PORT, () => {
     logger.info({ port: config.PORT }, "Server started");
   });
+
+  // Audit retention (B-16): drop events older than AUDIT_RETENTION_DAYS, now and daily.
+  scheduleAuditPrune(config.AUDIT_RETENTION_DAYS);
 }
 
 main().catch((err) => {

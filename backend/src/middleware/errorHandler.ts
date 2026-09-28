@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { config } from "../config";
 import logger from "../lib/logger";
 import { redactUrl } from "../lib/redactUrl";
+import { logAuditOnly, auditActor } from "../services/auditService";
 
 type HttpErrorLike = { status?: unknown; statusCode?: unknown; code?: unknown; type?: unknown };
 
@@ -42,6 +43,16 @@ export function errorHandler(
   if (status < 500) {
     const code = clientErrorCode(err, status);
     logger.warn({ status, code, method: req.method, url }, "Request rejected");
+    // A forged or stale CSRF token on an admin write is a security event (B-16): log-only, since
+    // anyone can send one.
+    if (code === "invalid_csrf_token") {
+      logAuditOnly({
+        action: "admin.csrf_rejected",
+        outcome: "denied",
+        actor: auditActor(req),
+        details: { method: req.method, path: `${req.baseUrl}${req.path}` },
+      });
+    }
     res.status(status).json({ error: code });
     return;
   }

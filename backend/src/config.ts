@@ -41,6 +41,8 @@ export const envSchema = z
         .default("false")
         .transform((v) => v === "true")
     ),
+    // How long security audit events are kept (B-16), in days. Older rows are pruned daily.
+    AUDIT_RETENTION_DAYS: z.coerce.number().int().min(1).default(90),
     // Filesystem path of the built SPA's `dist/` directory. When set, Express serves it as
     // static assets plus an HTML-accepting GET fallback to index.html (SPA client-side
     // routing). The production Docker image sets this to /app/public; leave unset to keep

@@ -4,6 +4,13 @@ import request from 'supertest'
 import type { Request, Response, NextFunction } from 'express'
 import type { Application } from '@prisma/client'
 
+// Audit rows are covered by the integration suite; here the store is stubbed (no DB).
+vi.mock('../services/auditService', async (orig) => ({
+  ...(await orig<typeof import('../services/auditService')>()),
+  recordAudit: vi.fn().mockResolvedValue(undefined),
+  auditRequest: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('../middleware/apiKeyAuth', () => ({
   apiKeyAuth: (req: Request, _res: Response, next: NextFunction) => {
     req.bouncerApp = {

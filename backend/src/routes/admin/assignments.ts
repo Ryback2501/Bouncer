@@ -7,6 +7,7 @@ import { isBouncerApplication, isBouncerAdminRole } from "../../lib/bouncerDefau
 import { handlePrismaError } from "../../lib/prismaErrors";
 import { validateBody } from "../../middleware/validate";
 import { asyncHandler } from "../../lib/asyncHandler";
+import { auditRequest } from "../../services/auditService";
 
 const router = Router({ mergeParams: true });
 
@@ -44,17 +45,22 @@ router.put("/:appId", validateBody(upsertAssignmentSchema), asyncHandler(async (
   // role that is already inactive, expiring or missing must not be stuck that way.
   const isRestore = active !== false && !expiredAt && (await isBouncerAdminRole(roleId));
   if (!isRestore && (await isGlobalAdminPortalRole(req.params.userId, req.params.appId))) {
+    await auditRequest(req, { action: "assignment.set", outcome: "denied", target: { type: "user", id: req.params.userId }, details: { applicationId: req.params.appId, roleId } });
     res.status(403).json(PROTECTED);
     return;
   }
   try {
-    res.json(
-      await svc.assignRole(req.params.userId, req.params.appId, {
-        roleId,
-        active: active ?? true,
-        expiredAt: expiredAt ? new Date(expiredAt) : null,
-      })
-    );
+    const assignment = await svc.assignRole(req.params.userId, req.params.appId, {
+      roleId,
+      active: active ?? true,
+      expiredAt: expiredAt ? new Date(expiredAt) : null,
+    });
+    await auditRequest(req, {
+      action: "assignment.set",
+      target: { type: "user", id: req.params.userId },
+      details: { applicationId: req.params.appId, roleId, active: active ?? true, expiredAt: expiredAt ?? null },
+    });
+    res.json(assignment);
   } catch (e) {
     if (handlePrismaError(e, res)) return;
     throw e;
@@ -62,9 +68,15 @@ router.put("/:appId", validateBody(upsertAssignmentSchema), asyncHandler(async (
 }));
 
 router.delete("/:appId", asyncHandler(async (req: Request, res: Response) => {
-  if (await isGlobalAdminPortalRole(req.params.userId, req.params.appId)) { res.status(403).json(PROTECTED); return; }
+  const target = { type: "user", id: req.params.userId };
+  if (await isGlobalAdminPortalRole(req.params.userId, req.params.appId)) {
+    await auditRequest(req, { action: "assignment.remove", outcome: "denied", target, details: { applicationId: req.params.appId } });
+    res.status(403).json(PROTECTED);
+    return;
+  }
   try {
     await svc.removeRole(req.params.userId, req.params.appId);
+    await auditRequest(req, { action: "assignment.remove", target, details: { applicationId: req.params.appId } });
     res.status(204).send();
   } catch (e) {
     if (handlePrismaError(e, res)) return;

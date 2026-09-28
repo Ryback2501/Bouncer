@@ -6,6 +6,7 @@ import { prisma } from "../../prisma";
 import { validateBody } from "../../middleware/validate";
 import { handlePrismaError } from "../../lib/prismaErrors";
 import { asyncHandler } from "../../lib/asyncHandler";
+import { auditRequest } from "../../services/auditService";
 import { isAllowedRedirectUri } from "../../lib/redirectUri";
 
 const router = Router();
@@ -55,12 +56,14 @@ router.post("/", validateBody(createSchema), asyncHandler(async (req: Request, r
     createdById: req.user!.id,
     redirectUri: redirectUri ?? null,
   });
+  await auditRequest(req, { action: "invitation.create", target: { type: "invitation", id: invitation.id }, details: { applicationId, roleId } });
   res.status(201).json(invitation);
 }));
 
 router.delete("/:id", asyncHandler(async (req: Request, res: Response) => {
   try {
-    await svc.deleteInvitation(req.params.id);
+    const invitation = await svc.deleteInvitation(req.params.id);
+    await auditRequest(req, { action: "invitation.delete", target: { type: "invitation", id: invitation.id }, details: { applicationId: invitation.applicationId, roleId: invitation.roleId } });
     res.status(204).send();
   } catch (e) {
     if (handlePrismaError(e, res)) return;

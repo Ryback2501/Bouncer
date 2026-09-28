@@ -79,6 +79,24 @@ CREATE TABLE "ApiKey" (
     CONSTRAINT "ApiKey_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "AuditEvent" (
+    "id" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "action" TEXT NOT NULL,
+    "outcome" TEXT NOT NULL,
+    "actorType" TEXT NOT NULL,
+    "actorId" TEXT,
+    "actorLabel" TEXT,
+    "targetType" TEXT,
+    "targetId" TEXT,
+    "targetLabel" TEXT,
+    "ip" TEXT,
+    "details" JSONB,
+
+    CONSTRAINT "AuditEvent_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Application_customId_key" ON "Application"("customId");
 
@@ -96,6 +114,15 @@ CREATE UNIQUE INDEX "Invitation_token_key" ON "Invitation"("token");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ApiKey_keyHash_key" ON "ApiKey"("keyHash");
+
+-- CreateIndex
+CREATE INDEX "AuditEvent_createdAt_idx" ON "AuditEvent"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "AuditEvent_action_idx" ON "AuditEvent"("action");
+
+-- CreateIndex
+CREATE INDEX "AuditEvent_actorId_idx" ON "AuditEvent"("actorId");
 
 -- AddForeignKey
 ALTER TABLE "Role" ADD CONSTRAINT "Role_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "Application"("id") ON DELETE CASCADE ON UPDATE CASCADE;

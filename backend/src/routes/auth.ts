@@ -8,6 +8,7 @@ import { prisma } from "../prisma";
 import { asyncHandler } from "../lib/asyncHandler";
 import { validateBody } from "../middleware/validate";
 import { generateCsrfToken } from "../middleware/csrf";
+import { recordAudit, auditActor } from "../services/auditService";
 
 const router = Router();
 
@@ -25,8 +26,19 @@ function requireProvider(clientId: string | undefined) {
 // - "app"  → external-app invite: do NOT keep a portal session; log out and send the user to the
 //            app's redirect URL (or a confirmation page).
 // - "admin" (or undefined) → admin login / admin invite: keep the portal session, go to the portal.
-function finishAuth(req: Request, res: Response) {
+export async function finishAuth(req: Request, res: Response) {
   const outcome = req.inviteOutcome;
+  if (req.user) {
+    await recordAudit({
+      action: "auth.login",
+      actor: auditActor(req),
+      details: {
+        provider: req.user.provider,
+        viaInvite: outcome?.kind === "app",
+        ...(outcome?.kind === "app" && { application: outcome.appCustomId }),
+      },
+    });
+  }
 
   if (outcome?.kind === "app") {
     const redirectTo =
@@ -139,7 +151,9 @@ router.post("/invite/stage", validateBody(inviteTokenSchema), asyncHandler(async
 }));
 
 // ── Logout (POST: sameSite=lax cookie makes cross-site POST CSRF-safe) ──────────
-router.post("/logout", (req: Request, res: Response) => {
+export async function logoutHandler(req: Request, res: Response) {
+  // Recorded before the session goes: afterwards there is no user to attribute it to.
+  if (req.user) await recordAudit({ action: "auth.logout", actor: auditActor(req) });
   req.logout((err) => {
     if (err) { res.status(500).json({ error: "logout_failed" }); return; }
     req.session.destroy(() => {
@@ -147,7 +161,9 @@ router.post("/logout", (req: Request, res: Response) => {
       res.status(204).send();
     });
   });
-});
+}
+
+router.post("/logout", logoutHandler);
 
 // There is deliberately no test-only / bypass login route here. OAuth is the only way to
 // obtain a portal session in every environment. The e2e suite seeds a session row directly

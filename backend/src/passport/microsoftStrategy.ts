@@ -43,7 +43,8 @@ export function setupMicrosoftStrategy() {
           delete req.session.inviteToken;
           const result = await findOrCreateUser(
             { sub: profile.id, provider: "microsoft", name: profile.displayName, email },
-            inviteToken
+            inviteToken,
+            req.ip
           );
           if (!result) return done(null, false);
           req.inviteOutcome = result.outcome;

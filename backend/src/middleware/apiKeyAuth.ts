@@ -4,10 +4,25 @@ import { prisma } from "../prisma";
 import logger from "../lib/logger";
 import { asyncHandler } from "../lib/asyncHandler";
 import { BOUNCER_APP_CUSTOM_ID } from "../lib/bouncerDefaults";
+import { logAuditOnly } from "../services/auditService";
+
+// Audit log line for a refused key (B-16). Log-only: anyone can present a bad key, so storing these
+// would let an attacker grow the audit table. Names a known key by id + label, never the key itself.
+function rejected(req: Request, reason: string, key?: { id: string; label: string | null }) {
+  logAuditOnly({
+    action: "api_key.rejected",
+    outcome: "denied",
+    actor: key
+      ? { type: "api_key", id: key.id, label: key.label, ip: req.ip ?? null }
+      : { type: "anonymous", id: null, label: null, ip: req.ip ?? null },
+    details: { reason },
+  });
+}
 
 export const apiKeyAuth = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) {
+    rejected(req, "missing_key");
     res.status(401).json({ error: "invalid_api_key" });
     return;
   }
@@ -21,11 +36,13 @@ export const apiKeyAuth = asyncHandler(async (req: Request, res: Response, next:
   });
 
   if (!apiKey) {
+    rejected(req, "unknown_key");
     res.status(401).json({ error: "invalid_api_key" });
     return;
   }
 
   if (apiKey.expiresAt && apiKey.expiresAt < new Date()) {
+    rejected(req, "expired", apiKey);
     res.status(401).json({ error: "api_key_expired" });
     return;
   }
@@ -49,6 +66,7 @@ export const apiKeyAuth = asyncHandler(async (req: Request, res: Response, next:
       { apiKeyId: apiKey.id },
       "Rejected an API key issued for the Bouncer portal application; it should be revoked"
     );
+    rejected(req, "portal_key", apiKey);
     res.status(403).json({ error: "api_key_not_permitted" });
     return;
   }
