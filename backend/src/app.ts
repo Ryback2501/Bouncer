@@ -177,7 +177,13 @@ export function createApp() {
     app.get(/.*/, (req, res, next) => {
       if (!req.accepts("html")) return next();
       res.setHeader("Cache-Control", "no-cache");
-      res.sendFile(path.join(config.STATIC_DIR!, "index.html"));
+      // A missing shell is a broken deployment, not a client error: sendFile's ENOENT carries
+      // status 404, which errorHandler would answer as a client 404. Report it as a server fault.
+      res.sendFile(path.join(config.STATIC_DIR!, "index.html"), (err) => {
+        if (err && !res.headersSent) {
+          next(new Error(`SPA shell could not be served: ${err.message}`, { cause: err }));
+        }
+      });
     });
   }
 

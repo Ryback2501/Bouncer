@@ -1,5 +1,8 @@
-import { vi, describe, it, expect } from 'vitest'
+import { vi, describe, it, expect, afterEach } from 'vitest'
 import request from 'supertest'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { createApp } from '../app'
 
 vi.mock('../prisma', () => ({ prisma: { $queryRaw: vi.fn() } }))
@@ -38,5 +41,24 @@ describe('client errors keep their status through the real app', () => {
     const res = await request(app).get('/api/v1/nope').set('Accept', 'application/json')
     expect(res.status).toBe(404)
     expect(res.body).toEqual({ error: 'not_found' })
+  })
+})
+
+// A deployment whose STATIC_DIR has no built index.html is a server fault. sendFile's ENOENT carries
+// status 404, which would otherwise pass for a client error: a JSON 404 and a warning, hiding it.
+describe('a missing SPA shell is a server error', () => {
+  const original = process.env.STATIC_DIR
+  afterEach(() => {
+    if (original === undefined) delete process.env.STATIC_DIR
+    else process.env.STATIC_DIR = original
+  })
+
+  it('answers a page load with 500 internal_error when index.html is missing', async () => {
+    vi.resetModules()
+    process.env.STATIC_DIR = mkdtempSync(path.join(tmpdir(), 'bouncer-empty-spa-'))
+    const { createApp: createFreshApp } = await vi.importActual<{ createApp: typeof createApp }>('../app')
+    const res = await request(createFreshApp()).get('/applications').set('Accept', 'text/html')
+    expect(res.status).toBe(500)
+    expect(res.body).toEqual({ error: 'internal_error' })
   })
 })
