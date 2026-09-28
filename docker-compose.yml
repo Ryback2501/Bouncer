@@ -31,7 +31,9 @@ services:
       # registered in provider consoles must also point at this origin (e.g.
       # http://localhost/auth/google/callback).
       - "80:3000"
-    # bash-scripts/_dockerLib.sh materializes backend/.env into a `.env.docker` sibling
+    # bash-scripts/_dockerLib.sh materializes backend/.env into a `.env.docker` sibling (only for
+    # the duration of each compose call: it is deleted afterwards, so run compose via
+    # bash-scripts/compose.sh)
     # with surrounding quotes stripped from each value, and we read that with
     # `format: raw` so compose does NOT interpolate `$` characters inside values (random
     # SESSION_SECRET / ENCRYPTION_KEY and some OAuth secrets contain literal `$`, which
