@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { urlField } from "../../lib/inputLimits";
 import * as svc from "../../services/invitationService";
 import { prisma } from "../../prisma";
 import { validateBody } from "../../middleware/validate";
@@ -12,7 +13,7 @@ const router = Router();
 const createSchema = z.object({
   applicationId: z.string().uuid(),
   roleId: z.string().uuid(),
-  redirectUri: z.string().url().optional(),
+  redirectUri: urlField.optional(),
 });
 
 // List every invitation across all applications. The admin UI groups by application.

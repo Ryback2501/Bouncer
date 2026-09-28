@@ -50,6 +50,15 @@ describe('POST /auth/invite', () => {
     expect(inv.findFirst).not.toHaveBeenCalled()
   })
 
+  // B-13: tokens are 64 hex chars; anything past 256 is not a token and is not even hashed.
+  it('rejects a token longer than 256 characters', async () => {
+    inv.findFirst.mockResolvedValue(null)
+    expect((await request(app).post('/auth/invite').send({ token: 'a'.repeat(257) })).status).toBe(400)
+    expect((await request(app).post('/auth/invite/stage').send({ token: 'a'.repeat(257) })).status).toBe(400)
+    expect(inv.findFirst).not.toHaveBeenCalled()
+    expect((await request(app).post('/auth/invite').send({ token: 'a'.repeat(256) })).status).toBe(200)
+  })
+
   // Preview is read-only. If loading the invite page armed the session, anyone who merely opened a
   // forwarded invite link — an existing admin, say — would redeem that invitation on their next
   // unrelated sign-in, without ever choosing to.

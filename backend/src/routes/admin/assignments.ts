@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { idField } from "../../lib/inputLimits";
 import * as svc from "../../services/assignmentService";
 import { prisma } from "../../prisma";
 import { isBouncerApplication, isBouncerAdminRole } from "../../lib/bouncerDefaults";
@@ -10,7 +11,7 @@ import { asyncHandler } from "../../lib/asyncHandler";
 const router = Router({ mergeParams: true });
 
 const upsertAssignmentSchema = z.object({
-  roleId: z.string().min(1),
+  roleId: idField,
   active: z.boolean().optional().default(true),
   expiredAt: z.string().datetime().nullable().optional(),
 });

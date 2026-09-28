@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import passport from "passport";
 import { createHash } from "crypto";
 import { z } from "zod";
+import { LIMITS } from "../lib/inputLimits";
 import { config } from "../config";
 import { prisma } from "../prisma";
 import { asyncHandler } from "../lib/asyncHandler";
@@ -90,7 +91,7 @@ router.get("/csrf-token", (req: Request, res: Response) => {
 // only happen when the recipient deliberately picks a provider. If loading the page were enough to
 // arm the session, anyone who merely opened a forwarded invite link — an existing admin, say — would
 // redeem that invitation on their next ordinary sign-in, without ever choosing to.
-const inviteTokenSchema = z.object({ token: z.string().min(1) });
+const inviteTokenSchema = z.object({ token: z.string().min(1).max(LIMITS.inviteToken) });
 
 async function findLiveInvitation(token: string) {
   return prisma.invitation.findFirst({
