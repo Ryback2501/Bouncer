@@ -66,17 +66,20 @@ describe('roleService', () => {
     it('updates role name and customId', async () => {
       const updated = { id: 'r1', name: 'SuperAdmin', customId: 'super-admin' }
       p.update.mockResolvedValue(updated)
-      const result = await updateRole('r1', { name: 'SuperAdmin', customId: 'super-admin' })
+      const result = await updateRole('app1', 'r1', { name: 'SuperAdmin', customId: 'super-admin' })
       expect(result).toEqual(updated)
-      expect(p.update).toHaveBeenCalledWith({ where: { id: 'r1' }, data: { name: 'SuperAdmin', customId: 'super-admin' } })
+      expect(p.update).toHaveBeenCalledWith({
+        where: { id: 'r1', applicationId: 'app1' },
+        data: { name: 'SuperAdmin', customId: 'super-admin' },
+      })
     })
   })
 
   describe('deleteRole', () => {
-    it('deletes role by id', async () => {
+    it('deletes the role by id within its application', async () => {
       p.delete.mockResolvedValue({ id: 'r1' })
-      await deleteRole('r1')
-      expect(p.delete).toHaveBeenCalledWith({ where: { id: 'r1' } })
+      await deleteRole('app1', 'r1')
+      expect(p.delete).toHaveBeenCalledWith({ where: { id: 'r1', applicationId: 'app1' } })
     })
   })
 })

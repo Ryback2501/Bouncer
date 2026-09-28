@@ -103,6 +103,8 @@ describe('DELETE /applications/:appId/api-keys/:keyId', () => {
     vi.mocked(svc.deleteApiKey).mockResolvedValue({} as unknown as Awaited<ReturnType<typeof svc.deleteApiKey>>)
     const res = await request(makeApp()).delete('/app1/api-keys/k1')
     expect(res.status).toBe(204)
+    // B-11: the delete is scoped to the application in the URL, not the key id alone.
+    expect(svc.deleteApiKey).toHaveBeenCalledWith('app1', 'k1')
   })
 
   it('returns 404 when key not found', async () => {

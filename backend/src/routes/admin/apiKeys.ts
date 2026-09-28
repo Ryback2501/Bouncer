@@ -36,7 +36,7 @@ router.post("/", validateBody(createApiKeySchema), asyncHandler(async (req: Requ
 
 router.delete("/:keyId", asyncHandler(async (req: Request, res: Response) => {
   try {
-    await svc.deleteApiKey(req.params.keyId);
+    await svc.deleteApiKey(req.params.appId, req.params.keyId);
     res.status(204).send();
   } catch (e) {
     if (handlePrismaError(e, res)) return;

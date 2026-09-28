@@ -70,10 +70,10 @@ describe('apiKeyService', () => {
   })
 
   describe('deleteApiKey', () => {
-    it('deletes api key by id', async () => {
+    it('deletes the api key by id within its application', async () => {
       p.delete.mockResolvedValue({ id: 'k1' })
-      await deleteApiKey('k1')
-      expect(p.delete).toHaveBeenCalledWith({ where: { id: 'k1' } })
+      await deleteApiKey('app1', 'k1')
+      expect(p.delete).toHaveBeenCalledWith({ where: { id: 'k1', applicationId: 'app1' } })
     })
   })
 })
