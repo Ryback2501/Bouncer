@@ -49,6 +49,14 @@ describe('trustProxyError', () => {
     }
   })
 
+  // `true` spelled as a subnet: a zero-length mask would match every address. proxy-addr refuses
+  // it as an invalid range, so it cannot slip past as a "valid" list either.
+  it('rejects subnets that match every address', () => {
+    for (const v of ['0.0.0.0/0', '::/0', '10.0.0.0/8, 0.0.0.0/0', '1.2.3.4/0.0.0.0']) {
+      expect(trustProxyError(v)).not.toBeNull()
+    }
+  })
+
   it('rejects values Express cannot parse', () => {
     for (const v of ['yes', 'bogus', '10.0.0.0/33', '1.5', '-1']) {
       expect(trustProxyError(v)).toMatch(/TRUST_PROXY|hop count/)
