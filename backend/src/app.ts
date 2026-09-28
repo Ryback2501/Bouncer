@@ -160,7 +160,7 @@ export function createApp() {
   // in frontend/), serve the built SPA from the same origin as the API. The hashed Vite
   // assets get `immutable` long caching; `index.html` is no-cache so the next deploy
   // lands on next visit. The fallback only fires for GETs that accept HTML so an API
-  // client that typo'd a route still gets a JSON 404 via errorHandler, not the SPA shell.
+  // client that typo'd a route still gets the JSON 404 below, not the SPA shell.
   if (config.STATIC_DIR) {
     app.use(
       express.static(config.STATIC_DIR, {
@@ -177,9 +177,21 @@ export function createApp() {
     app.get(/.*/, (req, res, next) => {
       if (!req.accepts("html")) return next();
       res.setHeader("Cache-Control", "no-cache");
-      res.sendFile(path.join(config.STATIC_DIR!, "index.html"));
+      // A missing shell is a broken deployment, not a client error: sendFile's ENOENT carries
+      // status 404, which errorHandler would answer as a client 404. Report it as a server fault.
+      res.sendFile(path.join(config.STATIC_DIR!, "index.html"), (err) => {
+        if (err && !res.headersSent) {
+          next(new Error(`SPA shell could not be served: ${err.message}`, { cause: err }));
+        }
+      });
     });
   }
+
+  // ── Not found ─────────────────────────────────────────────────────────────
+  // Anything unmatched above gets a JSON 404 instead of Express's HTML "Cannot GET" page.
+  app.use((_req, res) => {
+    res.status(404).json({ error: "not_found" });
+  });
 
   // ── Error handler ─────────────────────────────────────────────────────────
   app.use(errorHandler);
