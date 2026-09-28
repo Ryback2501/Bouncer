@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { subField, providerField } from "../../../lib/inputLimits";
 import { apiKeyAuth } from "../../../middleware/apiKeyAuth";
 import { prisma } from "../../../prisma";
 import { validateQuery } from "../../../middleware/validate";
@@ -11,8 +12,8 @@ const router = Router();
 // providers can collide. Resolving by sub alone could answer for a different person than the one
 // the app signed in, handing them that person's role (B-06).
 const accessQuerySchema = z.object({
-  sub: z.string().min(1),
-  provider: z.string().min(1),
+  sub: subField,
+  provider: providerField,
 });
 
 router.get("/access", apiKeyAuth, validateQuery(accessQuerySchema), asyncHandler(async (req: Request, res: Response) => {

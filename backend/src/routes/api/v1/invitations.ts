@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { customIdField, urlField } from "../../../lib/inputLimits";
 import { apiKeyAuth } from "../../../middleware/apiKeyAuth";
 import { validateBody } from "../../../middleware/validate";
 import { asyncHandler } from "../../../lib/asyncHandler";
@@ -10,8 +11,8 @@ import * as invitationService from "../../../services/invitationService";
 const router = Router();
 
 const createInvitationSchema = z.object({
-  role: z.string().min(1),
-  redirectUri: z.string().url().optional(),
+  role: customIdField,
+  redirectUri: urlField.optional(),
 });
 
 // Mint a single-use invitation for the application the API key belongs to. The user accepts it

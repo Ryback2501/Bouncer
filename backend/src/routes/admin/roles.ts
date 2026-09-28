@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { nameField, customIdField } from "../../lib/inputLimits";
 import * as svc from "../../services/roleService";
 import { isBouncerAdminRole } from "../../lib/bouncerDefaults";
 import { handlePrismaError } from "../../lib/prismaErrors";
@@ -9,13 +10,13 @@ import { asyncHandler } from "../../lib/asyncHandler";
 const router = Router({ mergeParams: true });
 
 const createRoleSchema = z.object({
-  name: z.string().min(1),
-  customId: z.string().min(1),
+  name: nameField,
+  customId: customIdField,
 });
 
 const updateRoleSchema = z.object({
-  name: z.string().min(1).optional(),
-  customId: z.string().min(1).optional(),
+  name: nameField.optional(),
+  customId: customIdField.optional(),
 });
 
 router.get("/", asyncHandler(async (req: Request, res: Response) => {

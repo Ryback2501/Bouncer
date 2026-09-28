@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { LIMITS, nameField, subField, providerField } from "../../lib/inputLimits";
 import * as svc from "../../services/userService";
 import { prisma } from "../../prisma";
 import { handlePrismaError } from "../../lib/prismaErrors";
@@ -9,21 +10,21 @@ import { asyncHandler } from "../../lib/asyncHandler";
 const router = Router();
 
 const listUsersSchema = z.object({
-  search: z.string().optional(),
+  search: z.string().max(LIMITS.search).optional(),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
 
 const createUserSchema = z.object({
-  name: z.string().min(1),
-  sub: z.string().min(1),
-  provider: z.string().min(1),
+  name: nameField,
+  sub: subField,
+  provider: providerField,
 });
 
 const updateUserSchema = z.object({
-  name: z.string().min(1).optional(),
-  sub: z.string().min(1).optional(),
-  provider: z.string().min(1).optional(),
+  name: nameField.optional(),
+  sub: subField.optional(),
+  provider: providerField.optional(),
 });
 
 router.get("/", validateQuery(listUsersSchema), asyncHandler(async (req: Request, res: Response) => {

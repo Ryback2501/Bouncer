@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { nameField, customIdField, redirectUrisField } from "../../lib/inputLimits";
 import * as svc from "../../services/applicationService";
 import { isBouncerApplication } from "../../lib/bouncerDefaults";
 import { handlePrismaError } from "../../lib/prismaErrors";
@@ -9,15 +10,15 @@ import { asyncHandler } from "../../lib/asyncHandler";
 const router = Router();
 
 const createApplicationSchema = z.object({
-  name: z.string().min(1),
-  customId: z.string().min(1),
-  redirectUris: z.array(z.string().url()).optional(),
+  name: nameField,
+  customId: customIdField,
+  redirectUris: redirectUrisField.optional(),
 });
 
 const updateApplicationSchema = z.object({
-  name: z.string().min(1).optional(),
-  customId: z.string().min(1).optional(),
-  redirectUris: z.array(z.string().url()).optional(),
+  name: nameField.optional(),
+  customId: customIdField.optional(),
+  redirectUris: redirectUrisField.optional(),
 });
 
 router.get("/", asyncHandler(async (_req: Request, res: Response) => {

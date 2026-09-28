@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { labelField } from "../../lib/inputLimits";
 import * as svc from "../../services/apiKeyService";
 import { isBouncerApplication } from "../../lib/bouncerDefaults";
 import { handlePrismaError } from "../../lib/prismaErrors";
@@ -9,7 +10,7 @@ import { asyncHandler } from "../../lib/asyncHandler";
 const router = Router({ mergeParams: true });
 
 const createApiKeySchema = z.object({
-  label: z.string().min(1).optional(),
+  label: labelField.optional(),
   expiresAt: z.string().datetime().nullable().optional(),
 });
 
