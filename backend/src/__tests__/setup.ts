@@ -2,6 +2,8 @@ process.env.NODE_ENV = 'test'
 process.env.DATABASE_URL =
   process.env.DATABASE_URL ?? 'postgresql://bouncer:bouncer@localhost:5432/bouncer_test'
 process.env.SESSION_SECRET = 'test-secret-minimum-sixteen-chars!!'
+// Its own key, distinct from SESSION_SECRET (B-15).
+process.env.CSRF_SECRET = 'test-csrf-secret-distinct-from-session!!'
 process.env.FRONTEND_URL = 'http://localhost:5173'
 // Tests manage the schema themselves (`prisma migrate deploy` in CI); never auto-migrate.
 process.env.MIGRATE_ON_START = 'false'

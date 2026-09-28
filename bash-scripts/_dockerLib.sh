@@ -11,7 +11,7 @@ ENV_EXAMPLE="$REPO_ROOT/backend/.env.example"
 ENV_DOCKER="$REPO_ROOT/backend/.env.docker"
 
 # Generate a CI-safe backend/.env from .env.example if one isn't already present. Fills in
-# SESSION_SECRET and ENCRYPTION_KEY with fresh random values; leaves OAuth keys blank and
+# SESSION_SECRET, CSRF_SECRET and ENCRYPTION_KEY with fresh random values; leaves OAuth keys blank and
 # POSTGRES_* at the example defaults. Idempotent: noop when the file exists.
 ensure_env_file() {
   if [[ -f "$ENV_FILE" ]]; then
@@ -22,17 +22,20 @@ ensure_env_file() {
     return 1
   fi
   echo "--- Generating $ENV_FILE from .env.example ---"
-  local session_secret encryption_key postgres_password
+  local session_secret csrf_secret encryption_key postgres_password
   session_secret="$(openssl rand -base64 48 | tr -d '\n')"
+  csrf_secret="$(openssl rand -base64 48 | tr -d '\n')"
   encryption_key="$(openssl rand -base64 32 | tr -d '\n')"
   # Hex: URL-safe, so it can sit inside DATABASE_URL unescaped. Never a shared default (B-08).
   postgres_password="$(openssl rand -hex 24)"
   awk \
     -v ss="$session_secret" \
+    -v cs="$csrf_secret" \
     -v ek="$encryption_key" \
     -v pp="$postgres_password" \
     '
       /^SESSION_SECRET=/ { print "SESSION_SECRET=" ss; next }
+      /^CSRF_SECRET=/ { print "CSRF_SECRET=" cs; next }
       /^ENCRYPTION_KEY=/ { print "ENCRYPTION_KEY=" ek; next }
       /^POSTGRES_PASSWORD=/ { print "POSTGRES_PASSWORD=" pp; next }
       /^DATABASE_URL=/ { gsub(/<POSTGRES_PASSWORD>/, pp); print; next }
@@ -41,6 +44,25 @@ ensure_env_file() {
   chmod 600 "$ENV_FILE"
   # Required in every NODE_ENV; Bouncer refuses to start while it is empty.
   echo "NOTE: set ADMIN_ALLOWED_EMAILS in $ENV_FILE to the email you will sign in with." >&2
+}
+
+# CSRF_SECRET became required after some backend/.env files were generated (B-15). Give an existing
+# file that has no non-empty CSRF_SECRET a fresh random one, so the stack keeps starting. Leaves a
+# file that already has one untouched.
+ensure_csrf_secret() {
+  [[ -f "$ENV_FILE" ]] || return 0
+  if grep -qE '^CSRF_SECRET=.+' "$ENV_FILE"; then
+    return 0
+  fi
+  local csrf_secret tmp
+  csrf_secret="$(openssl rand -base64 48 | tr -d '\n')"
+  tmp="$(mktemp)"
+  # Drop an empty `CSRF_SECRET=` line if present, then append the generated one.
+  grep -vE '^CSRF_SECRET=$' "$ENV_FILE" > "$tmp" || true
+  printf 'CSRF_SECRET=%s\n' "$csrf_secret" >> "$tmp"
+  cat "$tmp" > "$ENV_FILE"
+  rm -f "$tmp"
+  echo "NOTE: added a generated CSRF_SECRET to $ENV_FILE (required since B-15)." >&2
 }
 
 # Materialize backend/.env → backend/.env.docker, normalizing each VALUE so compose

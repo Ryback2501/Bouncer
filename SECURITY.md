@@ -23,6 +23,7 @@ built-in protections and what an operator must do to deploy it safely.
 | Variable | Requirement |
 |---|---|
 | `SESSION_SECRET` | ≥ 32 chars. Generate: `openssl rand -base64 48`. |
+| `CSRF_SECRET` | ≥ 32 chars and **different from `SESSION_SECRET`**: CSRF tokens and session cookies are signed with independent keys. Generate: `openssl rand -base64 48`. |
 | `ADMIN_ALLOWED_EMAILS` | Non-empty. Comma-separated emails permitted to **bootstrap the first global admin** — closes the "first OAuth sign-in wins admin" race. |
 | `ENCRYPTION_KEY` | Base64-encoded 32-byte key for encrypting PII at rest. Generate: `openssl rand -base64 32`. |
 
