@@ -37,6 +37,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://bouncer:bouncer@localhost:5432/bouncer_test
       SESSION_SECRET: ci-session-secret-minimum-sixteen-chars
+      CSRF_SECRET: ci-csrf-secret-distinct-from-the-session-one
       FRONTEND_URL: http://localhost:5173
       NODE_ENV: test
 
@@ -142,6 +143,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://bouncer:bouncer@localhost:5432/bouncer_test
       SESSION_SECRET: ci-session-secret-minimum-sixteen-chars
+      CSRF_SECRET: ci-csrf-secret-distinct-from-the-session-one
       FRONTEND_URL: http://localhost:5173
       NODE_ENV: test
 
@@ -204,6 +206,7 @@ jobs:
       # (`postgres`) on the Docker network — not via `localhost`.
       DATABASE_URL: postgresql://bouncer:bouncer@postgres:5432/bouncer_test
       SESSION_SECRET: ci-session-secret-minimum-sixteen-chars
+      CSRF_SECRET: ci-csrf-secret-distinct-from-the-session-one
       FRONTEND_URL: http://localhost:3000
       NODE_ENV: test
       # Required in every NODE_ENV since B-07 (with ENCRYPTION_KEY, generated in the first step).
@@ -298,6 +301,7 @@ jobs:
             echo "FRONTEND_URL=http://localhost"
             echo "TRUST_PROXY=false"
             echo "SESSION_SECRET=$(openssl rand -base64 48 | tr -d '\n')"
+            echo "CSRF_SECRET=$(openssl rand -base64 48 | tr -d '\n')"
             echo "ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -d '\n')"
             echo "ADMIN_ALLOWED_EMAILS=ci@example.com"
             echo "POSTGRES_USER=${POSTGRES_USER}"

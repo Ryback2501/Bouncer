@@ -8,6 +8,7 @@ import request from 'supertest'
 const mockConfig = vi.hoisted(() => ({
   NODE_ENV: 'test',
   SESSION_SECRET: 'test-secret-minimum-sixteen-chars!!',
+  CSRF_SECRET: 'test-csrf-secret-distinct-from-session!!',
   FRONTEND_URL: 'http://localhost:5173',
   GOOGLE_CLIENT_ID: 'test-google-id',
   GOOGLE_CLIENT_SECRET: 'test-google-secret',

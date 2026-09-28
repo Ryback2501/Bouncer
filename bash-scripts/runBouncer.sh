@@ -8,6 +8,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/bash-scripts/_dockerLib.sh"
 
 ensure_env_file
+ensure_csrf_secret
 
 echo "--- docker compose up -d --build ---"
 compose up -d --build

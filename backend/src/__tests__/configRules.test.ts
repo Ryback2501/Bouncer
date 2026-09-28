@@ -8,6 +8,7 @@ const valid = {
   NODE_ENV: 'development',
   DATABASE_URL: 'postgresql://u:p@localhost:5432/db',
   SESSION_SECRET: 'x'.repeat(32),
+  CSRF_SECRET: 'y'.repeat(32),
   FRONTEND_URL: 'http://localhost',
   ENCRYPTION_KEY: Buffer.from('0123456789abcdef0123456789abcdef').toString('base64'),
   ADMIN_ALLOWED_EMAILS: 'owner@example.com',
@@ -34,6 +35,19 @@ describe('startup checks apply in every NODE_ENV', () => {
 
     it(`requires ADMIN_ALLOWED_EMAILS in ${mode}`, () => {
       expect(failingFields({ ...valid, NODE_ENV: mode, ADMIN_ALLOWED_EMAILS: '' })).toContain('ADMIN_ALLOWED_EMAILS')
+    })
+
+    // B-15: CSRF tokens get their own key, independent of the session-signing one.
+    it(`requires CSRF_SECRET in ${mode}`, () => {
+      expect(failingFields({ ...valid, NODE_ENV: mode, CSRF_SECRET: undefined })).toContain('CSRF_SECRET')
+    })
+
+    it(`requires a CSRF_SECRET of at least 32 characters in ${mode}`, () => {
+      expect(failingFields({ ...valid, NODE_ENV: mode, CSRF_SECRET: 'y'.repeat(31) })).toContain('CSRF_SECRET')
+    })
+
+    it(`rejects a CSRF_SECRET equal to SESSION_SECRET in ${mode}`, () => {
+      expect(failingFields({ ...valid, NODE_ENV: mode, CSRF_SECRET: valid.SESSION_SECRET })).toContain('CSRF_SECRET')
     })
 
     // B-09: `true` lets any client pick its own IP via X-Forwarded-For and dodge the rate limits.

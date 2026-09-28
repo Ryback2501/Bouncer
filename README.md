@@ -56,6 +56,7 @@ services:
       FRONTEND_URL: http://localhost
       NODE_ENV: production
       SESSION_SECRET: <openssl rand -base64 48>
+      CSRF_SECRET: <openssl rand -base64 48, a different value>
       ENCRYPTION_KEY: <openssl rand -base64 32>
       ADMIN_ALLOWED_EMAILS: you@example.com
       # OAuth providers — fill in the client id + secret for each provider you want to
@@ -93,9 +94,9 @@ Database migrations are applied automatically when the container starts (the ima
 Clone the repo, then:
 
 1. Copy `backend/.env.example` to `backend/.env` and fill in the secrets (see the [OAuth provider setup](#oauth-provider-setup) section — at least one provider must be configured to sign in).
-2. Generate a `SESSION_SECRET` (required, ≥32 chars): `openssl rand -base64 48`
+2. Generate a `SESSION_SECRET` and a separate `CSRF_SECRET` (both required, ≥32 chars, and they must differ): run `openssl rand -base64 48` once for each.
 3. Generate an `ENCRYPTION_KEY` (required, encrypts user emails at rest): `openssl rand -base64 32`, and set `ADMIN_ALLOWED_EMAILS` (required) to the email you will sign in with. Bouncer refuses to start without these in any `NODE_ENV`.
-4. Bring up Postgres + Bouncer (builds the image locally): `bash bash-scripts/runBouncer.sh`. If `backend/.env` doesn't exist yet, it is generated with a random `SESSION_SECRET`, `ENCRYPTION_KEY` and `POSTGRES_PASSWORD` (already filled into `DATABASE_URL`). Postgres is published on `127.0.0.1:5432` only — reachable from this machine, not from the network.
+4. Bring up Postgres + Bouncer (builds the image locally): `bash bash-scripts/runBouncer.sh`. If `backend/.env` doesn't exist yet, it is generated with a random `SESSION_SECRET`, `CSRF_SECRET`, `ENCRYPTION_KEY` and `POSTGRES_PASSWORD` (already filled into `DATABASE_URL`); an existing `backend/.env` without a `CSRF_SECRET` gets one added. Postgres is published on `127.0.0.1:5432` only — reachable from this machine, not from the network.
 5. Open `http://localhost` in a browser. The first OAuth sign-in matching `ADMIN_ALLOWED_EMAILS` becomes the global admin.
 
 To stop: `bash bash-scripts/stopBouncer.sh` (preserves the Postgres volume). Use `--purge` to also drop the volume and locally-built images.

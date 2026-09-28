@@ -18,6 +18,9 @@ export const envSchema = z
     PORT: z.coerce.number().default(3000),
     DATABASE_URL: z.string().min(1),
     SESSION_SECRET: z.string().min(16),
+    // HMAC key for CSRF tokens (B-15). Independent of SESSION_SECRET: the two controls must not
+    // share a key. Checked (length, distinct) in superRefine below.
+    CSRF_SECRET: z.string({ required_error: "must be set (generate: openssl rand -base64 48)" }),
     FRONTEND_URL: z.string().url(),
     // Express "trust proxy" setting: `false`, an integer hop count, or a subnet/IP list (see
     // Express docs). `true` is rejected (B-09). Unset/empty: trust one hop iff FRONTEND_URL is
@@ -108,6 +111,20 @@ export const envSchema = z
     const trustProxyIssue = trustProxyError(env.TRUST_PROXY);
     if (trustProxyIssue) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["TRUST_PROXY"], message: trustProxyIssue });
+    }
+
+    if (env.CSRF_SECRET.length < 32) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["CSRF_SECRET"],
+        message: "must be at least 32 characters (generate: openssl rand -base64 48)",
+      });
+    } else if (env.CSRF_SECRET === env.SESSION_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["CSRF_SECRET"],
+        message: "must differ from SESSION_SECRET (generate its own: openssl rand -base64 48)",
+      });
     }
 
     if (env.ADMIN_ALLOWED_EMAILS.length === 0) {
