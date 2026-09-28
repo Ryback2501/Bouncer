@@ -38,6 +38,16 @@ export function createApp() {
   // tokens (for links minted before they moved into the URL fragment) and OAuth code/state.
   app.use(pinoHttp({ logger, serializers: { req: redactReq, res: redactRes } }));
 
+  // ── No caching of API responses ───────────────────────────────────────────
+  // Admin data, role decisions and CSRF tokens must never be stored by a shared cache (proxy, CDN)
+  // or reused from the browser cache (B-17). Mounted before every other middleware so early
+  // answers — rate-limit 429s, body-parser 400s, CSRF 403s, 401s, JSON 404s — carry it too. The
+  // SPA's static assets and /health are unaffected.
+  app.use(["/auth", "/admin", "/api"], (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+
   // ── Security ──────────────────────────────────────────────────────────────
   // CSP for the merged service that serves both the SPA (HTML/CSS/JS/fonts/images) and
   // the API (JSON). Verbatim port of what frontend/nginx.conf used to set when the SPA
