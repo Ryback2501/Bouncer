@@ -41,8 +41,8 @@ describe('Authentication guards', () => {
     const res = await request(app).post('/auth/test-login')
     expect(res.status).toBe(404)
     // Status alone is not enough: the removed route also answered 404 when no global admin
-    // existed, but with a JSON body. An unmatched Express route yields the default HTML 404,
-    // which supertest surfaces as an empty body.
-    expect(res.body).not.toHaveProperty('error')
+    // existed, with `no_admin_user`. Only the app's catch-all for unmatched routes answers
+    // `not_found`.
+    expect(res.body).toEqual({ error: 'not_found' })
   })
 })

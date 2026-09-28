@@ -160,7 +160,7 @@ export function createApp() {
   // in frontend/), serve the built SPA from the same origin as the API. The hashed Vite
   // assets get `immutable` long caching; `index.html` is no-cache so the next deploy
   // lands on next visit. The fallback only fires for GETs that accept HTML so an API
-  // client that typo'd a route still gets a JSON 404 via errorHandler, not the SPA shell.
+  // client that typo'd a route still gets the JSON 404 below, not the SPA shell.
   if (config.STATIC_DIR) {
     app.use(
       express.static(config.STATIC_DIR, {
@@ -180,6 +180,12 @@ export function createApp() {
       res.sendFile(path.join(config.STATIC_DIR!, "index.html"));
     });
   }
+
+  // ── Not found ─────────────────────────────────────────────────────────────
+  // Anything unmatched above gets a JSON 404 instead of Express's HTML "Cannot GET" page.
+  app.use((_req, res) => {
+    res.status(404).json({ error: "not_found" });
+  });
 
   // ── Error handler ─────────────────────────────────────────────────────────
   app.use(errorHandler);

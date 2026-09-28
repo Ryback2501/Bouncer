@@ -29,6 +29,13 @@ describe('errorHandler (EXPOSE_ERROR_DETAILS=true)', () => {
     })
   })
 
+  // The flag is for debugging server faults; a rejected request never echoes the error text (B-10).
+  it('never adds a message to a client error', () => {
+    const res = makeRes()
+    errorHandler(Object.assign(new Error('invalid csrf token'), { status: 403, code: 'EBADCSRFTOKEN' }), req, res, next)
+    expect((res.json as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith({ error: 'invalid_csrf_token' })
+  })
+
   it('uses a generic message for non-Error values', () => {
     const res = makeRes()
     errorHandler(null, req, res, next)
