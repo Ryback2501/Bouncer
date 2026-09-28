@@ -25,7 +25,7 @@ export function encryptField(plaintext: string): string {
   const key = getKey();
   if (!key) return plaintext; // no key (dev) → store plaintext
   const iv = randomBytes(IV_LEN);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const cipher = createCipheriv("aes-256-gcm", key, iv, { authTagLength: TAG_LEN });
   const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
   return PREFIX + Buffer.concat([iv, tag, ciphertext]).toString("base64");
@@ -38,10 +38,16 @@ export function decryptField(value: string): string {
     throw new Error("ENCRYPTION_KEY is required to read encrypted data");
   }
   const raw = Buffer.from(value.slice(PREFIX.length), "base64");
+  // Node's GCM accepts tags as short as 4 bytes, so a truncated value would be checked against a
+  // 4-byte tag — forgeable in 2^32 tries by anyone who can write to the DB (B-12). Require the full
+  // 16-byte tag, both here and via authTagLength.
+  if (raw.length < IV_LEN + TAG_LEN) {
+    throw new Error("Encrypted value is too short");
+  }
   const iv = raw.subarray(0, IV_LEN);
   const tag = raw.subarray(IV_LEN, IV_LEN + TAG_LEN);
   const ciphertext = raw.subarray(IV_LEN + TAG_LEN);
-  const decipher = createDecipheriv("aes-256-gcm", key, iv);
+  const decipher = createDecipheriv("aes-256-gcm", key, iv, { authTagLength: TAG_LEN });
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
 }
