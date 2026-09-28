@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isHttpsOrigin, trustProxySetting, missingTrustProxyWarning } from '../lib/securityPolicy'
+import { isHttpsOrigin, trustProxySetting, trustProxyError, missingTrustProxyWarning } from '../lib/securityPolicy'
 
 // B-07. Security behaviour follows what the deployment actually is, never the NODE_ENV label: the
 // image is routinely run as development/test, which used to switch these protections off.
@@ -33,9 +33,40 @@ describe('trustProxySetting', () => {
 
   it('lets an explicit TRUST_PROXY win', () => {
     expect(trustProxySetting('false', 'https://bouncer.example.com')).toBe(false)
-    expect(trustProxySetting('true', 'http://localhost')).toBe(true)
+    expect(trustProxySetting('FALSE', 'https://bouncer.example.com')).toBe(false)
     expect(trustProxySetting('2', 'http://localhost')).toBe(2)
     expect(trustProxySetting('10.0.0.0/8', 'http://localhost')).toBe('10.0.0.0/8')
+  })
+})
+
+// B-09. `true` trusts every hop, so req.ip becomes the left-most X-Forwarded-For entry — chosen by
+// the client. Rotating it gave a fresh bucket in every per-IP rate limiter. Anything Express cannot
+// parse used to crash createApp() with "invalid IP address"; it is now a startup config error too.
+describe('trustProxyError', () => {
+  it('rejects true, whatever the case', () => {
+    for (const v of ['true', 'TRUE', ' True ']) {
+      expect(trustProxyError(v)).toMatch(/X-Forwarded-For/)
+    }
+  })
+
+  // `true` spelled as a subnet: a zero-length mask would match every address. proxy-addr refuses
+  // it as an invalid range, so it cannot slip past as a "valid" list either.
+  it('rejects subnets that match every address', () => {
+    for (const v of ['0.0.0.0/0', '::/0', '10.0.0.0/8, 0.0.0.0/0', '1.2.3.4/0.0.0.0']) {
+      expect(trustProxyError(v)).not.toBeNull()
+    }
+  })
+
+  it('rejects values Express cannot parse', () => {
+    for (const v of ['yes', 'bogus', '10.0.0.0/33', '1.5', '-1']) {
+      expect(trustProxyError(v)).toMatch(/TRUST_PROXY|hop count/)
+    }
+  })
+
+  it('accepts unset, false, a hop count, or proxy IPs/subnets', () => {
+    for (const v of [undefined, '', '  ', 'false', 'FALSE', '0', '1', '2', '10.0.0.0/8', 'loopback, 10.0.0.0/8', '::1']) {
+      expect(trustProxyError(v)).toBeNull()
+    }
   })
 })
 
