@@ -56,6 +56,15 @@ describe('startup checks apply in every NODE_ENV', () => {
     })
   }
 
+  // B-16: audit events are kept 90 days unless configured otherwise.
+  it('defaults AUDIT_RETENTION_DAYS to 90 and requires a whole number of at least 1', () => {
+    expect(envSchema.parse(valid).AUDIT_RETENTION_DAYS).toBe(90)
+    expect(envSchema.parse({ ...valid, AUDIT_RETENTION_DAYS: '365' }).AUDIT_RETENTION_DAYS).toBe(365)
+    for (const bad of ['0', '-5', '1.5', 'forever']) {
+      expect(failingFields({ ...valid, AUDIT_RETENTION_DAYS: bad })).toContain('AUDIT_RETENTION_DAYS')
+    }
+  })
+
   it('rejects a TRUST_PROXY that Express cannot parse', () => {
     expect(failingFields({ ...valid, TRUST_PROXY: 'bogus' })).toContain('TRUST_PROXY')
   })

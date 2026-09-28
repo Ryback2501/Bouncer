@@ -12,6 +12,7 @@ import { UserDetail } from './pages/Users/UserDetail'
 import { ApiKeyList } from './pages/ApiKeys/ApiKeyList'
 import { AssignmentList } from './pages/Assignments/AssignmentList'
 import { InvitationList } from './pages/Invitations/InvitationList'
+import { AuditLog } from './pages/Audit/AuditLog'
 import { InviteAccept } from './pages/InviteAccept'
 import { LegacyInviteRedirect } from './pages/LegacyInviteRedirect'
 import { Invited } from './pages/Invited'
@@ -40,6 +41,7 @@ function ProtectedRoutes() {
         <Route path="users/:userId" element={<UserDetail />} />
         <Route path="assignments" element={<AssignmentList />} />
         <Route path="invitations" element={<InvitationList />} />
+        <Route path="audit" element={<AuditLog />} />
       </Route>
     </Routes>
   )

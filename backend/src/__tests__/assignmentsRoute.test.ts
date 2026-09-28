@@ -2,6 +2,13 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import express from 'express'
 import request from 'supertest'
 
+// Audit rows are covered by the integration suite; here the store is stubbed (no DB).
+vi.mock('../services/auditService', async (orig) => ({
+  ...(await orig<typeof import('../services/auditService')>()),
+  recordAudit: vi.fn().mockResolvedValue(undefined),
+  auditRequest: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('../services/assignmentService', () => ({
   getUserRoles: vi.fn(),
   assignRole: vi.fn(),

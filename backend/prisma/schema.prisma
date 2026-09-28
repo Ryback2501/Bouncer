@@ -95,3 +95,29 @@ model ApiKey {
   createdAt     DateTime    @default(now())
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 }
+
+// Security audit log (B-16). Deliberately NO foreign keys: an event must outlive the user, key or
+// application it mentions — and deletions are exactly what an investigation looks at. Actor and
+// target labels are snapshots, like Invitation.createdByApiKeyLabel. Never holds secrets (tokens,
+// raw keys, key hashes, session/CSRF ids, OAuth codes) or email addresses (PII, encrypted on User).
+model AuditEvent {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  // e.g. "auth.login", "application.delete"
+  action      String
+  // "success" | "denied" | "failure"
+  outcome     String
+  // "user" | "api_key" | "anonymous"
+  actorType   String
+  actorId     String?
+  actorLabel  String?
+  targetType  String?
+  targetId    String?
+  targetLabel String?
+  ip          String?
+  details     Json?
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([actorId])
+}

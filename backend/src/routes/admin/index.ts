@@ -6,6 +6,7 @@ import usersRouter from "./users";
 import assignmentsRouter from "./assignments";
 import apiKeysRouter from "./apiKeys";
 import invitationsRouter from "./invitations";
+import auditRouter from "./audit";
 import { prisma } from "../../prisma";
 import { asyncHandler } from "../../lib/asyncHandler";
 
@@ -56,5 +57,6 @@ router.use("/applications/:appId/api-keys", apiKeysRouter);
 router.use("/users", usersRouter);
 router.use("/users/:userId/roles", assignmentsRouter);
 router.use("/invitations", invitationsRouter);
+router.use("/audit", auditRouter);
 
 export default router;

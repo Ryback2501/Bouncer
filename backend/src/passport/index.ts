@@ -7,6 +7,7 @@ import { setupGitHubStrategy } from "./githubStrategy";
 import { setupLinkedInStrategy } from "./linkedinStrategy";
 import { ensureBouncerDefaults, BOUNCER_APP_CUSTOM_ID, BOUNCER_ADMIN_ROLE_CUSTOM_ID } from "../lib/bouncerDefaults";
 import { config } from "../config";
+import { recordAudit, logAuditOnly, type AuditActor } from "../services/auditService";
 
 export async function configurePassport() {
   await ensureBouncerDefaults();
@@ -43,6 +44,8 @@ export async function configurePassport() {
 // admin invite); "app" means an external-app invite — log the user out and send them to the app.
 export interface AcceptOutcome {
   kind: "admin" | "app";
+  /** Signed in by accepting an invitation (admin or app), as opposed to an ordinary admin login. */
+  viaInvite: boolean;
   redirectUri: string | null;
   appCustomId: string;
 }
@@ -52,9 +55,40 @@ export interface AcceptResult {
   outcome: AcceptOutcome;
 }
 
+type SignInProfile = { sub: string; provider: string; name: string; email: string };
+
+// Audit helpers for sign-in (B-16). A user actor is id + display name, never the email; a rejected
+// stranger is identified by provider + sub.
+function userActor(user: { id: string; name: string | null }, ip?: string | null): AuditActor {
+  return { type: "user", id: user.id, label: user.name ?? null, ip: ip ?? null };
+}
+
+// A rejected known user (no or expired portal role) is stored. A rejected stranger is log-only:
+// anyone with an OAuth account can trigger that at will, and storing it would let them grow the
+// audit table on demand — the same rule as the other unauthenticated rejections.
+async function auditRejected(
+  reason: string,
+  profile: SignInProfile,
+  ip?: string | null,
+  user?: { id: string; name: string | null }
+): Promise<void> {
+  const details = { provider: profile.provider, sub: profile.sub, reason };
+  if (user) {
+    await recordAudit({ action: "auth.login_rejected", outcome: "denied", actor: userActor(user, ip), details });
+    return;
+  }
+  logAuditOnly({
+    action: "auth.login_rejected",
+    outcome: "denied",
+    actor: { type: "anonymous", id: null, label: null, ip: ip ?? null },
+    details,
+  });
+}
+
 export async function findOrCreateUser(
-  profile: { sub: string; provider: string; name: string; email: string },
-  inviteToken?: string
+  profile: SignInProfile,
+  inviteToken?: string,
+  ip?: string | null
 ): Promise<AcceptResult | null> {
   const { app: bouncerApp, role: adminRole } = await ensureBouncerDefaults();
 
@@ -62,7 +96,7 @@ export async function findOrCreateUser(
   // The invitation carries its target application + role. Create/update the user, assign the
   // role (idempotent upsert), and consume the invite — all atomically.
   if (inviteToken) {
-    return prisma.$transaction(async (tx) => {
+    const accepted = await prisma.$transaction(async (tx) => {
       const tokenHash = createHash("sha256").update(inviteToken).digest("hex");
       const invitation = await tx.invitation.findFirst({
         where: { token: tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
@@ -119,15 +153,29 @@ export async function findOrCreateUser(
           },
         })) > 0;
 
-      return {
+      const result: AcceptResult = {
         user,
         outcome: {
           kind: isAdminInvite || keptRoleUsable ? "admin" : "app",
+          viaInvite: true,
           redirectUri: invitation.redirectUri,
           appCustomId: invitation.application.customId,
         },
       };
+      return { result, invitation: { id: invitation.id, applicationId: invitation.applicationId, roleId: invitation.roleId } };
     });
+    // Audited once the transaction has committed, so only a redemption that actually happened is recorded.
+    if (!accepted) {
+      await auditRejected("invalid_invitation", profile, ip);
+      return null;
+    }
+    await recordAudit({
+      action: "invitation.redeem",
+      actor: userActor(accepted.result.user, ip),
+      target: { type: "invitation", id: accepted.invitation.id },
+      details: { applicationId: accepted.invitation.applicationId, roleId: accepted.invitation.roleId },
+    });
+    return accepted.result;
   }
 
   // ── No invite: existing-admin login ─────────────────────────────────────────
@@ -138,13 +186,19 @@ export async function findOrCreateUser(
     const userRole = await prisma.userRole.findFirst({
       where: { userId: existing.id, applicationId: bouncerApp.id, roleId: adminRole.id, active: true },
     });
-    if (!userRole) return null;
-    if (userRole.expiredAt && userRole.expiredAt < new Date()) return null;
+    if (!userRole) {
+      await auditRejected("no_portal_role", profile, ip, existing);
+      return null;
+    }
+    if (userRole.expiredAt && userRole.expiredAt < new Date()) {
+      await auditRejected("portal_role_expired", profile, ip, existing);
+      return null;
+    }
     const user = await prisma.user.update({
       where: { id: existing.id },
       data: { name: profile.name, email: profile.email },
     });
-    return { user, outcome: { kind: "admin", redirectUri: null, appCustomId: bouncerApp.customId } };
+    return { user, outcome: { kind: "admin", viaInvite: false, redirectUri: null, appCustomId: bouncerApp.customId } };
   }
 
   // ── No invite, no user: bootstrap the very first user as global admin ────────
@@ -159,6 +213,7 @@ export async function findOrCreateUser(
     // the "first person to reach OAuth wins global admin" race. (Required in production via config.)
     const allowlist = config.ADMIN_ALLOWED_EMAILS;
     if (allowlist.length > 0 && !allowlist.includes(profile.email.toLowerCase())) {
+      await auditRejected("not_allowlisted", profile, ip);
       return null;
     }
     const user = await prisma.$transaction(async (tx) => {
@@ -176,9 +231,16 @@ export async function findOrCreateUser(
       });
       return created;
     });
-    return { user, outcome: { kind: "admin", redirectUri: null, appCustomId: bouncerApp.customId } };
+    await recordAudit({
+      action: "auth.bootstrap",
+      actor: userActor(user, ip),
+      target: { type: "user", id: user.id, label: user.name ?? null },
+      details: { provider: profile.provider },
+    });
+    return { user, outcome: { kind: "admin", viaInvite: false, redirectUri: null, appCustomId: bouncerApp.customId } };
   }
 
   // Admins exist, no invitation token — reject (non-invited, non-admin sign-in).
+  await auditRejected("not_invited", profile, ip);
   return null;
 }

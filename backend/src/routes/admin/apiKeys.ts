@@ -6,6 +6,7 @@ import { isBouncerApplication } from "../../lib/bouncerDefaults";
 import { handlePrismaError } from "../../lib/prismaErrors";
 import { validateBody } from "../../middleware/validate";
 import { asyncHandler } from "../../lib/asyncHandler";
+import { auditRequest } from "../../services/auditService";
 
 const router = Router({ mergeParams: true });
 
@@ -24,6 +25,7 @@ router.get("/", asyncHandler(async (req: Request, res: Response) => {
 // be found and removed; apiKeyAuth rejects it at use in the meantime.
 router.post("/", validateBody(createApiKeySchema), asyncHandler(async (req: Request, res: Response) => {
   if (await isBouncerApplication(req.params.appId)) {
+    await auditRequest(req, { action: "api_key.create", outcome: "denied", target: { type: "api_key" }, details: { applicationId: req.params.appId } });
     res.status(403).json({ error: "The Bouncer application cannot be issued API keys" });
     return;
   }
@@ -32,12 +34,15 @@ router.post("/", validateBody(createApiKeySchema), asyncHandler(async (req: Requ
     label,
     expiresAt: expiresAt ? new Date(expiresAt) : null,
   });
+  // Never the raw key: only its id, label and application.
+  await auditRequest(req, { action: "api_key.create", target: { type: "api_key", id: result.id, label: result.label }, details: { applicationId: req.params.appId } });
   res.status(201).json(result);
 }));
 
 router.delete("/:keyId", asyncHandler(async (req: Request, res: Response) => {
   try {
-    await svc.deleteApiKey(req.params.appId, req.params.keyId);
+    const key = await svc.deleteApiKey(req.params.appId, req.params.keyId);
+    await auditRequest(req, { action: "api_key.delete", target: { type: "api_key", id: key.id, label: key.label }, details: { applicationId: req.params.appId } });
     res.status(204).send();
   } catch (e) {
     if (handlePrismaError(e, res)) return;

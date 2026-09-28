@@ -6,6 +6,7 @@ import { prisma } from "../../prisma";
 import { handlePrismaError } from "../../lib/prismaErrors";
 import { validateBody, validateQuery } from "../../middleware/validate";
 import { asyncHandler } from "../../lib/asyncHandler";
+import { auditRequest, changedFields } from "../../services/auditService";
 
 const router = Router();
 
@@ -35,7 +36,9 @@ router.get("/", validateQuery(listUsersSchema), asyncHandler(async (req: Request
 router.post("/", validateBody(createUserSchema), asyncHandler(async (req: Request, res: Response) => {
   const { name, sub, provider } = req.body as z.infer<typeof createUserSchema>;
   try {
-    res.status(201).json(await svc.createUser({ name, sub, provider }));
+    const user = await svc.createUser({ name, sub, provider });
+    await auditRequest(req, { action: "user.create", target: { type: "user", id: user.id, label: user.name }, details: { provider } });
+    res.status(201).json(user);
   } catch (e) {
     if (handlePrismaError(e, res)) return;
     throw e;
@@ -50,10 +53,16 @@ router.get("/:userId", asyncHandler(async (req: Request, res: Response) => {
 
 router.patch("/:userId", validateBody(updateUserSchema), asyncHandler(async (req: Request, res: Response) => {
   const target = await prisma.user.findUnique({ where: { id: req.params.userId } });
-  if (target?.isGlobalAdmin) { res.status(403).json({ error: "The global admin cannot be modified" }); return; }
+  if (target?.isGlobalAdmin) {
+    await auditRequest(req, { action: "user.update", outcome: "denied", target: { type: "user", id: target.id, label: target.name } });
+    res.status(403).json({ error: "The global admin cannot be modified" });
+    return;
+  }
   const { name, sub, provider } = req.body as z.infer<typeof updateUserSchema>;
   try {
-    res.json(await svc.updateUser(req.params.userId, { name, sub, provider }));
+    const user = await svc.updateUser(req.params.userId, { name, sub, provider });
+    await auditRequest(req, { action: "user.update", target: { type: "user", id: user.id, label: user.name }, details: { fields: changedFields({ name, sub, provider }) } });
+    res.json(user);
   } catch (e) {
     if (handlePrismaError(e, res)) return;
     throw e;
@@ -62,9 +71,14 @@ router.patch("/:userId", validateBody(updateUserSchema), asyncHandler(async (req
 
 router.delete("/:userId", asyncHandler(async (req: Request, res: Response) => {
   const target = await prisma.user.findUnique({ where: { id: req.params.userId } });
-  if (target?.isGlobalAdmin) { res.status(403).json({ error: "The global admin cannot be deleted" }); return; }
+  if (target?.isGlobalAdmin) {
+    await auditRequest(req, { action: "user.delete", outcome: "denied", target: { type: "user", id: target.id, label: target.name } });
+    res.status(403).json({ error: "The global admin cannot be deleted" });
+    return;
+  }
   try {
-    await svc.deleteUser(req.params.userId);
+    const user = await svc.deleteUser(req.params.userId);
+    await auditRequest(req, { action: "user.delete", target: { type: "user", id: user.id, label: user.name }, details: { provider: user.provider } });
     res.status(204).send();
   } catch (e) {
     if (handlePrismaError(e, res)) return;

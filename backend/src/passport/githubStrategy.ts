@@ -37,7 +37,8 @@ export function setupGitHubStrategy() {
           delete req.session.inviteToken;
           const result = await findOrCreateUser(
             { sub: profile.id, provider: "github", name: profile.displayName || profile.username || email, email },
-            inviteToken
+            inviteToken,
+            req.ip
           );
           if (!result) return done(null, false);
           req.inviteOutcome = result.outcome;
