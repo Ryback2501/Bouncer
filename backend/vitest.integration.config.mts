@@ -6,10 +6,9 @@ export default defineConfig({
     include: ['src/__tests__/integration/**/*.test.ts'],
     setupFiles: ['src/__tests__/setup.ts'],
     testTimeout: 30000,
-    // Run integration test files sequentially — they share a database
+    // Run integration test files sequentially — they share a database. (Vitest 4 dropped
+    // `poolOptions.forks.singleFork`, which silently let the files run in parallel.)
     pool: 'forks',
-    poolOptions: {
-      forks: { singleFork: true },
-    },
+    fileParallelism: false,
   },
 })

@@ -32,6 +32,13 @@ router.get("/", asyncHandler(async (req: Request, res: Response) => {
 
 router.put("/:appId", validateBody(upsertAssignmentSchema), asyncHandler(async (req: Request, res: Response) => {
   const { roleId, active, expiredAt } = req.body as z.infer<typeof upsertAssignmentSchema>;
+  // The role must belong to the application in the URL, as for invitations. Otherwise App A's
+  // assignment could point at App B's role, and the access API would report it to App A (B-11).
+  const role = await prisma.role.findUnique({ where: { id: roleId }, select: { applicationId: true } });
+  if (!role || role.applicationId !== req.params.appId) {
+    res.status(400).json({ error: "role_not_in_application" });
+    return;
+  }
   // The one change allowed is a repair: back to the admin role, active, with no expiry. A portal
   // role that is already inactive, expiring or missing must not be stuck that way.
   const isRestore = active !== false && !expiredAt && (await isBouncerAdminRole(roleId));

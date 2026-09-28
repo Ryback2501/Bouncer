@@ -89,6 +89,8 @@ describe('PATCH /applications/:appId/roles/:roleId', () => {
     const res = await request(makeApp()).patch('/app1/roles/r1').send({ name: 'Updated' })
     expect(res.status).toBe(200)
     expect(res.body.name).toBe('Updated')
+    // B-11: the update is scoped to the application in the URL, not the role id alone.
+    expect(svc.updateRole).toHaveBeenCalledWith('app1', 'r1', { name: 'Updated', customId: undefined })
   })
 
   it('returns 400 when a field is an empty string', async () => {
@@ -119,6 +121,7 @@ describe('DELETE /applications/:appId/roles/:roleId', () => {
     vi.mocked(svc.deleteRole).mockResolvedValue({} as unknown as Awaited<ReturnType<typeof svc.deleteRole>>)
     const res = await request(makeApp()).delete('/app1/roles/r1')
     expect(res.status).toBe(204)
+    expect(svc.deleteRole).toHaveBeenCalledWith('app1', 'r1')
   })
 
   it('returns 404 when role not found', async () => {

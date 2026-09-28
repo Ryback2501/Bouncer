@@ -18,10 +18,12 @@ export async function createRole(applicationId: string, data: { name: string; cu
   return prisma.role.create({ data: { ...data, applicationId } });
 }
 
-export async function updateRole(id: string, data: { name?: string; customId?: string }) {
-  return prisma.role.update({ where: { id }, data });
+// Scoped to the application: a role of another application is not found (P2025 → 404), even when
+// its id is known (B-11).
+export async function updateRole(applicationId: string, id: string, data: { name?: string; customId?: string }) {
+  return prisma.role.update({ where: { id, applicationId }, data });
 }
 
-export async function deleteRole(id: string) {
-  return prisma.role.delete({ where: { id } });
+export async function deleteRole(applicationId: string, id: string) {
+  return prisma.role.delete({ where: { id, applicationId } });
 }

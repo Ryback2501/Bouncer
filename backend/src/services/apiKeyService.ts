@@ -22,6 +22,8 @@ export async function createApiKey(
   return { ...apiKey, rawKey };
 }
 
-export async function deleteApiKey(id: string) {
-  return prisma.apiKey.delete({ where: { id } });
+// Scoped to the application: another application's key is not found (P2025 → 404), even when its
+// id is known (B-11).
+export async function deleteApiKey(applicationId: string, id: string) {
+  return prisma.apiKey.delete({ where: { id, applicationId } });
 }

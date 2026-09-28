@@ -9,7 +9,7 @@ vi.mock('../services/assignmentService', () => ({
 }))
 
 vi.mock('../prisma', () => ({
-  prisma: { user: { findUnique: vi.fn() } },
+  prisma: { user: { findUnique: vi.fn() }, role: { findUnique: vi.fn() } },
 }))
 
 vi.mock('../lib/bouncerDefaults', () => ({
@@ -25,10 +25,13 @@ import router from '../routes/admin/assignments'
 const mockUserRole = { id: 'ur1', userId: 'u1', applicationId: 'app1', roleId: 'r1', active: true, expiredAt: null }
 
 const findUser = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>
+const findRole = prisma.role.findUnique as unknown as ReturnType<typeof vi.fn>
 
-// By default the target is an ordinary user and the app an ordinary application.
+// By default the target is an ordinary user, the app an ordinary application, and the role one of
+// that application (app1).
 function asOrdinary() {
   findUser.mockResolvedValue({ isGlobalAdmin: false })
+  findRole.mockResolvedValue({ applicationId: 'app1' })
   vi.mocked(isBouncerApplication).mockResolvedValue(false)
   vi.mocked(isBouncerAdminRole).mockResolvedValue(false)
 }
@@ -61,6 +64,22 @@ describe('PUT /users/:userId/roles/:appId', () => {
     const res = await request(makeApp()).put('/u1/roles/app1').send({ roleId: 'r1' })
     expect(res.status).toBe(200)
     expect(res.body.roleId).toBe('r1')
+  })
+
+  // B-11: App A's assignment must not point at App B's role.
+  it("returns 400 role_not_in_application for another application's role", async () => {
+    findRole.mockResolvedValue({ applicationId: 'app2' })
+    const res = await request(makeApp()).put('/u1/roles/app1').send({ roleId: 'r-of-app2' })
+    expect(res.status).toBe(400)
+    expect(res.body).toEqual({ error: 'role_not_in_application' })
+    expect(svc.assignRole).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 role_not_in_application for a role that does not exist', async () => {
+    findRole.mockResolvedValue(null)
+    const res = await request(makeApp()).put('/u1/roles/app1').send({ roleId: 'nope' })
+    expect(res.status).toBe(400)
+    expect(res.body).toEqual({ error: 'role_not_in_application' })
   })
 
   it('returns 400 when roleId is missing', async () => {
@@ -125,6 +144,7 @@ describe("the global admin's portal role", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     findUser.mockResolvedValue({ isGlobalAdmin: true })
+    findRole.mockResolvedValue({ applicationId: 'bouncer-app' })
     vi.mocked(isBouncerApplication).mockResolvedValue(true)
     vi.mocked(isBouncerAdminRole).mockResolvedValue(false)
   })
