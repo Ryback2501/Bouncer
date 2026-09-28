@@ -5,21 +5,24 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import request from 'supertest'
+import { randomBytes } from 'node:crypto'
 import { prisma } from '../../prisma'
 import { makeTestApp } from './testApp'
 
 const app = makeTestApp()
+// Unique per run, and outside other files' cleanup patterns (e.g. applications.test.ts's `test-int-`).
+const PREFIX = `int-scope-${randomBytes(4).toString('hex')}`
 
 let appA: string
 let appB: string
 
 beforeEach(async () => {
-  appA = (await request(app).post('/admin/applications').send({ name: 'Scope A', customId: 'test-int-scope-a' })).body.id
-  appB = (await request(app).post('/admin/applications').send({ name: 'Scope B', customId: 'test-int-scope-b' })).body.id
+  appA = (await request(app).post('/admin/applications').send({ name: 'Scope A', customId: `${PREFIX}-a` })).body.id
+  appB = (await request(app).post('/admin/applications').send({ name: 'Scope B', customId: `${PREFIX}-b` })).body.id
 })
 
 afterEach(async () => {
-  await prisma.application.deleteMany({ where: { customId: { startsWith: 'test-int-scope-' } } })
+  await prisma.application.deleteMany({ where: { customId: { startsWith: PREFIX } } })
 })
 
 describe('API keys are scoped to the application in the URL', () => {
@@ -66,7 +69,7 @@ describe('roles are scoped to the application in the URL', () => {
 // Found in review alongside B-11: the assignment PUT stored any roleId under :appId, so App A's
 // assignment could point at App B's role — and the access API then reported App B's role to App A.
 describe('assignments only accept a role of the application in the URL', () => {
-  const sub = 'test-int-scope-user'
+  const sub = `${PREFIX}-user`
   let userId: string
   let roleA: string
   let roleB: string
