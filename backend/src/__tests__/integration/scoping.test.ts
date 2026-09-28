@@ -62,3 +62,33 @@ describe('roles are scoped to the application in the URL', () => {
     expect(await prisma.role.findUnique({ where: { id: roleB } })).toBeNull()
   })
 })
+
+// Found in review alongside B-11: the assignment PUT stored any roleId under :appId, so App A's
+// assignment could point at App B's role — and the access API then reported App B's role to App A.
+describe('assignments only accept a role of the application in the URL', () => {
+  const sub = 'test-int-scope-user'
+  let userId: string
+  let roleA: string
+  let roleB: string
+
+  beforeEach(async () => {
+    userId = (await request(app).post('/admin/users').send({ name: 'Scope User', sub, provider: 'google' })).body.id
+    roleA = (await request(app).post(`/admin/applications/${appA}/roles`).send({ name: 'Viewer', customId: 'viewer' })).body.id
+    roleB = (await request(app).post(`/admin/applications/${appB}/roles`).send({ name: 'Owner', customId: 'owner' })).body.id
+  })
+
+  afterEach(async () => {
+    await prisma.user.deleteMany({ where: { sub } })
+  })
+
+  it("rejects another application's role", async () => {
+    const res = await request(app).put(`/admin/users/${userId}/roles/${appA}`).send({ roleId: roleB })
+    expect(res.status).toBe(400)
+    expect(res.body).toEqual({ error: 'role_not_in_application' })
+    expect(await prisma.userRole.findFirst({ where: { userId } })).toBeNull()
+
+    const ok = await request(app).put(`/admin/users/${userId}/roles/${appA}`).send({ roleId: roleA })
+    expect(ok.status).toBe(200)
+    expect(ok.body.roleId).toBe(roleA)
+  })
+})

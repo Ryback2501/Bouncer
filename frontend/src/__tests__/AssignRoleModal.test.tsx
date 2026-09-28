@@ -85,6 +85,27 @@ describe('AssignRoleModal', () => {
     await waitFor(() => expect(mockToast.error).toHaveBeenCalledWith('Failed to assign role'))
   })
 
+  // A role picked for one application must never be submitted for another: the backend rejects the
+  // mismatch with role_not_in_application. Switching application leaves the role unselected.
+  it('clears the selected role when the application changes', async () => {
+    const otherApp = { ...mockApp, id: 'app2', name: 'Other App', customId: 'other' }
+    const otherRole = { ...mockRole, id: 'r2', name: 'Viewer', applicationId: 'app2' }
+    vi.mocked(getApplications).mockResolvedValue([mockApp, otherApp])
+    vi.mocked(getRoles).mockImplementation(async (appId: string) => (appId === 'app2' ? [otherRole] : [mockRole]))
+    renderWithProviders(
+      <AssignRoleModal open={true} onClose={vi.fn()} userId="u1" existingAppIds={[]} />
+    )
+    await waitFor(() => expect(screen.getByText('Editor')).toBeInTheDocument())
+    fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'r1' } })
+
+    fireEvent.change(screen.getByLabelText('Application'), { target: { value: 'app2' } })
+    await waitFor(() => expect(screen.getByText('Viewer')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Assign'))
+
+    await waitFor(() => expect(screen.getByText('Role is required')).toBeInTheDocument())
+    expect(assignRole).not.toHaveBeenCalled()
+  })
+
   it('calls onClose when Cancel is clicked', async () => {
     const onClose = vi.fn()
     renderWithProviders(
