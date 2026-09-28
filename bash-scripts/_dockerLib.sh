@@ -132,17 +132,19 @@ read_env_value() {
 # ENCRYPTION_KEY, OAuth secrets) from it via the service's `env_file:` field with `format: raw`,
 # but only when compose starts: a container keeps the environment it was created with (restarts
 # included), so the plaintext copy of every secret is not left lying around between runs. It is
-# removed on success, on failure (the exit code is kept) and on Ctrl-C / TERM (e.g. `logs -f`).
+# removed on success, on failure (the exit code is kept) and on Ctrl-C / TERM / HUP (e.g. a
+# terminal closed during `logs -f`). The traps go in before the file is written.
 compose() {
-  materialize_env_file
+  trap 'rm -f "$ENV_DOCKER"; exit 129' HUP
   trap 'rm -f "$ENV_DOCKER"; exit 130' INT
   trap 'rm -f "$ENV_DOCKER"; exit 143' TERM
+  materialize_env_file
   local rc=0
   POSTGRES_USER=$(read_env_value POSTGRES_USER "$ENV_DOCKER") \
   POSTGRES_PASSWORD=$(read_env_value POSTGRES_PASSWORD "$ENV_DOCKER") \
   POSTGRES_DB=$(read_env_value POSTGRES_DB "$ENV_DOCKER") \
   docker compose "$@" || rc=$?
   rm -f "$ENV_DOCKER"
-  trap - INT TERM
+  trap - HUP INT TERM
   return "$rc"
 }
