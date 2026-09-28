@@ -47,18 +47,32 @@ ensure_env_file() {
 }
 
 # CSRF_SECRET became required after some backend/.env files were generated (B-15). Give an existing
-# file that has no non-empty CSRF_SECRET a fresh random one, so the stack keeps starting. Leaves a
-# file that already has one untouched.
+# file with no usable CSRF_SECRET a fresh random one, so the stack keeps starting. "Usable" is judged
+# on the value materialize_env_file will pass on: inline ` # comment` stripped, trimmed, surrounding
+# quotes removed — so `CSRF_SECRET=""` or `CSRF_SECRET=  # todo` count as missing. A file that
+# already has a value is left untouched.
 ensure_csrf_secret() {
   [[ -f "$ENV_FILE" ]] || return 0
-  if grep -qE '^CSRF_SECRET=.+' "$ENV_FILE"; then
+  if awk '
+    /^CSRF_SECRET=/ {
+      v = substr($0, index($0, "=") + 1)
+      if (match(v, /[[:space:]]#/)) v = substr(v, 1, RSTART - 1)
+      sub(/^[[:space:]]+/, "", v); sub(/[[:space:]]+$/, "", v)
+      f = substr(v, 1, 1); l = substr(v, length(v), 1)
+      if (length(v) >= 2 && ((f == "\"" && l == "\"") || (f == "\047" && l == "\047")))
+        v = substr(v, 2, length(v) - 2)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+      if (length(v) > 0) found = 1
+    }
+    END { exit found ? 0 : 1 }
+  ' "$ENV_FILE"; then
     return 0
   fi
   local csrf_secret tmp
   csrf_secret="$(openssl rand -base64 48 | tr -d '\n')"
   tmp="$(mktemp)"
-  # Drop an empty `CSRF_SECRET=` line if present, then append the generated one.
-  grep -vE '^CSRF_SECRET=$' "$ENV_FILE" > "$tmp" || true
+  # Drop any blank-valued CSRF_SECRET line, then append the generated one.
+  grep -v '^CSRF_SECRET=' "$ENV_FILE" > "$tmp" || true
   printf 'CSRF_SECRET=%s\n' "$csrf_secret" >> "$tmp"
   cat "$tmp" > "$ENV_FILE"
   rm -f "$tmp"
