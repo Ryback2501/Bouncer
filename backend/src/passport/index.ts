@@ -224,6 +224,13 @@ export async function findOrCreateUser(
   // simultaneous first sign-ins queue up and only the first finds the latch open — the others then
   // see the admin and are refused like any uninvited stranger. The partial unique index
   // User_single_global_admin is the database-level backstop should anything slip past the lock.
+  // Fast path, outside any transaction: once bootstrapped (the normal state), a stranger's sign-in
+  // is refused without queueing on the lock — a flood of them would otherwise tie up pooled
+  // connections. The locked transaction below re-checks, so this cannot open the latch twice.
+  if ((await prisma.user.count({ where: { isGlobalAdmin: true } })) > 0) {
+    await auditRejected("not_invited", profile, ip);
+    return null;
+  }
   let bootstrap: { user: Express.User } | { reason: "not_invited" | "not_allowlisted" };
   try {
     bootstrap = await prisma.$transaction(async (tx) => {

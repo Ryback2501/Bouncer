@@ -50,6 +50,7 @@ describe('findOrCreateUser — admin bootstrap allowlist (H1)', () => {
     mockConfig.ADMIN_ALLOWED_EMAILS = []
     pu.findUnique.mockResolvedValue(null) // no existing user
     pur.count.mockResolvedValue(0)
+    pu.count.mockResolvedValue(0) // fast path outside the lock sees an open latch
     calls = []
     admins = 0 // no global admin has ever existed → bootstrap path
     tx = {
@@ -96,10 +97,19 @@ describe('findOrCreateUser — admin bootstrap allowlist (H1)', () => {
 
   // B-20: the latch is checked inside the creating transaction, after taking the bootstrap lock —
   // never before it, or simultaneous first sign-ins could all see an open latch.
-  it('takes the lock, then checks the latch, then creates — in one transaction', async () => {
+  it('takes the lock, then re-checks the latch, then creates — in one transaction', async () => {
+    pu.count.mockResolvedValue(0)
     await findOrCreateUser(profile)
     expect(calls).toEqual(['lock', 'count', 'create'])
-    expect(pu.count).not.toHaveBeenCalled() // no check outside the transaction
+  })
+
+  // Once bootstrapped, a stranger's sign-in must not queue on the bootstrap lock (a flood of them
+  // would otherwise tie up pooled connections): a plain count refuses it before any transaction.
+  it('refuses without taking the lock once a global admin exists', async () => {
+    pu.count.mockResolvedValue(1)
+    expect(await findOrCreateUser(profile)).toBeNull()
+    expect(ptx).not.toHaveBeenCalled()
+    expect(calls).toEqual([])
   })
 
   it('refuses (instead of failing) when the database rejects a second global admin', async () => {
