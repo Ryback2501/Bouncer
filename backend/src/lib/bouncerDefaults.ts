@@ -65,3 +65,17 @@ export async function isBouncerAdminRole(roleId: string): Promise<boolean> {
     role.application.customId === BOUNCER_APP_CUSTOM_ID
   );
 }
+
+/**
+ * The single definition of "portal admin": the user holds the Bouncer application's `admin` role,
+ * active and not expired. Used by passport's deserializeUser (a session only stays signed in while
+ * this holds) and, independently, by the requireAdmin guard (INFO-01).
+ */
+export async function hasActivePortalAdminRole(userId: string): Promise<boolean> {
+  const { app, role } = await ensureBouncerDefaults();
+  const userRole = await prisma.userRole.findFirst({
+    where: { userId, applicationId: app.id, roleId: role.id, active: true },
+  });
+  if (!userRole) return false;
+  return !(userRole.expiredAt && userRole.expiredAt < new Date());
+}
