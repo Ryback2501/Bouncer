@@ -7,7 +7,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import request from 'supertest'
 import { createHash, randomBytes } from 'crypto'
 import { prisma } from '../../prisma'
-import { makeTestApp } from './testApp'
+import { makeTestApp, makeGlobalAdmin } from './testApp'
 import { ensureBouncerDefaults } from '../../lib/bouncerDefaults'
 
 const app = makeTestApp()
@@ -197,9 +197,7 @@ describe("the global admin's portal role — integration", () => {
     const { app: bouncerApp, role: adminRole } = await ensureBouncerDefaults()
     bouncerAppId = bouncerApp.id
     adminRoleId = adminRole.id
-    globalAdminId = (await prisma.user.create({
-      data: { name: 'Global Admin', sub: `${PREFIX}-global`, provider: 'google', isGlobalAdmin: true },
-    })).id
+    globalAdminId = (await makeGlobalAdmin({ name: 'Global Admin', sub: `${PREFIX}-global`, provider: 'google' })).id
     await prisma.userRole.create({
       data: { userId: globalAdminId, applicationId: bouncerAppId, roleId: adminRoleId, active: true },
     })

@@ -33,7 +33,7 @@ beforeAll(async () => {
   await prisma.user.upsert({
     where: { id: testAdmin.id! },
     update: {},
-    create: { id: testAdmin.id!, name: testAdmin.name!, email: testAdmin.email!, sub: testAdmin.sub!, provider: testAdmin.provider!, isGlobalAdmin: true },
+    create: { id: testAdmin.id!, name: testAdmin.name!, email: testAdmin.email!, sub: testAdmin.sub!, provider: testAdmin.provider!, isGlobalAdmin: false },
   })
   appId = (await request(app).post('/admin/applications').send({ name: `${PREFIX} App`, customId: PREFIX })).body.id
 })

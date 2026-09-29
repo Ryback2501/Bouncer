@@ -108,6 +108,9 @@ CREATE UNIQUE INDEX "Role_applicationId_customId_key" ON "Role"("applicationId",
 CREATE UNIQUE INDEX "User_sub_provider_key" ON "User"("sub", "provider");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "User_single_global_admin" ON "User"("isGlobalAdmin") WHERE ("isGlobalAdmin" = true);
+
+-- CreateIndex
 CREATE UNIQUE INDEX "UserRole_userId_applicationId_key" ON "UserRole"("userId", "applicationId");
 
 -- CreateIndex
