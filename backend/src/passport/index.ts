@@ -5,7 +5,7 @@ import { setupGoogleStrategy } from "./googleStrategy";
 import { setupMicrosoftStrategy } from "./microsoftStrategy";
 import { setupGitHubStrategy } from "./githubStrategy";
 import { setupLinkedInStrategy } from "./linkedinStrategy";
-import { ensureBouncerDefaults, BOUNCER_APP_CUSTOM_ID, BOUNCER_ADMIN_ROLE_CUSTOM_ID } from "../lib/bouncerDefaults";
+import { ensureBouncerDefaults, BOUNCER_APP_CUSTOM_ID, BOUNCER_ADMIN_ROLE_CUSTOM_ID, hasActivePortalAdminRole } from "../lib/bouncerDefaults";
 import { config } from "../config";
 import { recordAudit, logAuditOnly, type AuditActor } from "../services/auditService";
 import { isAllowedRedirectUri } from "../lib/redirectUri";
@@ -27,12 +27,11 @@ export async function configurePassport() {
       const user = await prisma.user.findUnique({ where: { id } });
       if (!user) return done(null, false);
 
-      const { app, role } = await ensureBouncerDefaults();
-      const userRole = await prisma.userRole.findFirst({
-        where: { userId: id, applicationId: app.id, roleId: role.id, active: true },
-      });
-      if (!userRole) return done(null, false);
-      if (userRole.expiredAt && userRole.expiredAt < new Date()) return done(null, false);
+      // Invariant: a session stays signed in only while its user is an active portal admin — so
+      // "signed in" means "portal admin" everywhere. Re-checked on every request, so removing or
+      // expiring the role ends a live session at once. requireAdmin checks the same thing again
+      // on its own (INFO-01), so loosening this cannot open the admin API by itself.
+      if (!(await hasActivePortalAdminRole(id))) return done(null, false);
 
       done(null, user);
     } catch (err) {
