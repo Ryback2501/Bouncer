@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
-import { customIdField, urlField } from "../../../lib/inputLimits";
+import { customIdField, urlField, emailField } from "../../../lib/inputLimits";
 import { apiKeyAuth } from "../../../middleware/apiKeyAuth";
 import { validateBody } from "../../../middleware/validate";
 import { asyncHandler } from "../../../lib/asyncHandler";
@@ -14,12 +14,14 @@ const router = Router();
 const createInvitationSchema = z.object({
   role: customIdField,
   redirectUri: urlField.optional(),
+  // Optional invitee email (B-19): when set, only a sign-in reporting it can redeem the invitation.
+  email: emailField.optional(),
 });
 
 // Mint a single-use invitation for the application the API key belongs to. The user accepts it
 // at inviteUrl (Bouncer-hosted OAuth), which creates the user and assigns the requested role.
 router.post("/", apiKeyAuth, validateBody(createInvitationSchema), asyncHandler(async (req: Request, res: Response) => {
-  const { role, redirectUri } = req.body as z.infer<typeof createInvitationSchema>;
+  const { role, redirectUri, email } = req.body as z.infer<typeof createInvitationSchema>;
   const application = req.bouncerApp!;
 
   const targetRole = await roleService.getRoleByCustomId(application.id, role);
@@ -41,6 +43,7 @@ router.post("/", apiKeyAuth, validateBody(createInvitationSchema), asyncHandler(
     // and a suspicious one cannot be traced back after the fact.
     createdByApiKeyId: req.bouncerApiKey?.id ?? null,
     createdByApiKeyLabel: req.bouncerApiKey?.label ?? null,
+    email: email ?? null,
   });
 
   // Actor = the API key. Never the invite URL: it carries the token.

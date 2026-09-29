@@ -134,6 +134,48 @@ describe('findOrCreateUser records its decision', () => {
     expect(JSON.stringify(logOnly.mock.calls)).not.toContain('rawtoken')
   })
 
+  // B-19: an invitation bound to an email is only redeemed by a sign-in reporting that email.
+  function boundInviteTx(email: string) {
+    return {
+      invitation: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'inv9', applicationId: 'bouncer-app', roleId: 'admin-role', redirectUri: null, email,
+          application: { customId: 'bouncer' }, role: { customId: 'admin' },
+        }),
+        update: vi.fn(),
+      },
+      user: { upsert: vi.fn().mockResolvedValue({ id: 'u9', name: 'Pat', isGlobalAdmin: false }) },
+      userRole: { upsert: vi.fn(), count: vi.fn() },
+    }
+  }
+
+  it('a bound invitation is redeemed by the matching email, whatever its case', async () => {
+    const tx = boundInviteTx('pat@example.com')
+    ptx.mockImplementation(async (cb: (t: unknown) => unknown) => cb(tx))
+    const result = await findOrCreateUser({ ...profile, email: 'Pat@Example.COM' }, 'rawtoken', IP)
+    expect(result?.user).toMatchObject({ id: 'u9' })
+    expect(tx.invitation.update).toHaveBeenCalled()
+  })
+
+  it('a bound invitation is refused for another email and stays unused', async () => {
+    const tx = boundInviteTx('invitee@example.com')
+    ptx.mockImplementation(async (cb: (t: unknown) => unknown) => cb(tx))
+    expect(await findOrCreateUser(profile, 'rawtoken', IP)).toBeNull()
+    expect(tx.user.upsert).not.toHaveBeenCalled()
+    expect(tx.userRole.upsert).not.toHaveBeenCalled()
+    expect(tx.invitation.update).not.toHaveBeenCalled()
+    expect(audit).not.toHaveBeenCalled()
+    expect(logOnly).toHaveBeenCalledWith({
+      action: 'auth.login_rejected',
+      outcome: 'denied',
+      actor: anonymous,
+      details: { provider: 'google', sub: 'g-123', reason: 'invite_email_mismatch' },
+    })
+    const logged = JSON.stringify(logOnly.mock.calls)
+    expect(logged).not.toContain('invitee@example.com')
+    expect(logged).not.toContain('pat@example.com')
+  })
+
   it('invitation redeemed (after the transaction commits)', async () => {
     const tx = {
       invitation: {

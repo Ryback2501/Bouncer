@@ -372,6 +372,65 @@ describe('POST /admin/invitations (admin UI cross-app mint)', () => {
   })
 })
 
+// B-19. Invitations can be bound to the invitee's email (mandatory for the portal), stored
+// encrypted, and portal invitations expire after 4 hours instead of 24.
+describe('email-bound invitations', () => {
+  const HOUR = 60 * 60 * 1000
+  const tokenOf = (inviteUrl: string) => inviteUrl.split('#')[1]
+  const hoursLeft = (expiresAt: string) => (new Date(expiresAt).getTime() - Date.now()) / HOUR
+
+  it('refuses a portal invitation without an email', async () => {
+    const { app: bouncerApp, role: adminRole } = await ensureBouncerDefaults()
+    const res = await request(app).post('/admin/invitations').send({ applicationId: bouncerApp.id, roleId: adminRole.id })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('email_required')
+  })
+
+  it('stores the email encrypted, lasts 4 hours, and only the named invitee can redeem it', async () => {
+    const { app: bouncerApp, role: adminRole } = await ensureBouncerDefaults()
+    const res = await request(app).post('/admin/invitations')
+      .send({ applicationId: bouncerApp.id, roleId: adminRole.id, email: `${PREFIX}-New@Example.com` })
+    expect(res.status).toBe(201)
+    const id = res.body.id
+    expect(res.body.email).toBe(`${PREFIX}-new@example.com`)
+    expect(hoursLeft(res.body.expiresAt)).toBeGreaterThan(3.9)
+    expect(hoursLeft(res.body.expiresAt)).toBeLessThanOrEqual(4)
+
+    const [raw] = await prisma.$queryRawUnsafe<{ email: string }[]>('SELECT email FROM "Invitation" WHERE id = $1', id)
+    expect(raw.email).toMatch(/^enc:v1:/)
+
+    const token = tokenOf(res.body.inviteUrl)
+    const stranger = { sub: `${PREFIX}-stranger`, provider: 'google', name: 'Stranger', email: 'someone.else@example.com' }
+    expect(await findOrCreateUser(stranger, token)).toBeNull()
+    expect((await prisma.invitation.findUnique({ where: { id } }))!.usedAt).toBeNull()
+    expect(await prisma.user.findFirst({ where: { sub: stranger.sub } })).toBeNull()
+
+    const invitee = { sub: `${PREFIX}-invitee`, provider: 'google', name: 'Invitee', email: `${PREFIX}-NEW@example.COM` }
+    const accepted = await findOrCreateUser(invitee, token)
+    expect(accepted?.outcome.kind).toBe('admin')
+    expect((await prisma.invitation.findUnique({ where: { id } }))!.usedAt).not.toBeNull()
+  })
+
+  it('keeps application invitations at 24 hours, with an optional email', async () => {
+    const unbound = await request(app).post('/admin/invitations').send({ applicationId: app1Id, roleId: editorRoleId })
+    expect(unbound.status).toBe(201)
+    expect(unbound.body.email).toBeNull()
+    expect(hoursLeft(unbound.body.expiresAt)).toBeGreaterThan(23.9)
+
+    const bound = await request(app).post('/admin/invitations').send({ applicationId: app1Id, roleId: editorRoleId, email: 'user@example.com' })
+    expect(bound.body.email).toBe('user@example.com')
+  })
+
+  it('lets an API key bind an application invitation to an email', async () => {
+    const res = await request(app).post('/api/v1/invitations').set('Authorization', `Bearer ${rawApiKey}`)
+      .send({ role: 'editor', email: 'api.user@example.com' })
+    expect(res.status).toBe(201)
+    const token = tokenOf(res.body.inviteUrl)
+    const row = await prisma.invitation.findFirst({ where: { token: hash(token) } })
+    expect(row!.email).toBe('api.user@example.com')
+  })
+})
+
 describe('GET /admin/invitations (cross-app listing)', () => {
   it('returns invitations across all applications with application + role includes', async () => {
     const res = await request(app).get('/admin/invitations')

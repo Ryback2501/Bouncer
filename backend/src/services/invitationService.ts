@@ -2,7 +2,9 @@ import { prisma } from "../prisma";
 import { randomBytes, createHash } from "crypto";
 import { config } from "../config";
 
-const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
+// Portal (Bouncer admin) invitations are short-lived (B-19); application invitations last a day.
+const PORTAL_INVITE_TTL_MS = 4 * 60 * 60 * 1000;
+const APP_INVITE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export async function createInvitation(opts: {
   applicationId: string;
@@ -14,10 +16,14 @@ export async function createInvitation(opts: {
   // attribution at the worst possible moment.
   createdByApiKeyId?: string | null;
   createdByApiKeyLabel?: string | null;
+  // Only a sign-in reporting this email may redeem the invitation (B-19). Already normalised.
+  email?: string | null;
+  // Targets the Bouncer portal application: shorter lifetime.
+  portal?: boolean;
 }) {
   const rawToken = randomBytes(32).toString("hex");
   const tokenHash = createHash("sha256").update(rawToken).digest("hex");
-  const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
+  const expiresAt = new Date(Date.now() + (opts.portal ? PORTAL_INVITE_TTL_MS : APP_INVITE_TTL_MS));
   const { token: _hash, ...invitation } = await prisma.invitation.create({
     data: {
       token: tokenHash,
@@ -27,6 +33,7 @@ export async function createInvitation(opts: {
       redirectUri: opts.redirectUri ?? null,
       createdByApiKeyId: opts.createdByApiKeyId ?? null,
       createdByApiKeyLabel: opts.createdByApiKeyLabel ?? null,
+      email: opts.email ?? null,
       expiresAt,
     },
     include: {

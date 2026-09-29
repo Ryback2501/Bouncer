@@ -19,8 +19,9 @@ function encryptEmailInData(data: unknown): void {
   }
 }
 
-// Application-layer encryption of PII at rest: User.email is encrypted on write and decrypted on
-// read everywhere this client is used (including nested relations and interactive transactions).
+// Application-layer encryption of PII at rest: User.email and Invitation.email (the invitee, B-19)
+// are encrypted on write and decrypted on read everywhere this client is used (including nested
+// relations and interactive transactions).
 export const prisma = base.$extends({
   name: "encrypt-pii",
   query: {
@@ -48,6 +49,12 @@ export const prisma = base.$extends({
         return query(args);
       },
     },
+    invitation: {
+      async create({ args, query }) {
+        encryptEmailInData(args.data);
+        return query(args);
+      },
+    },
   },
   result: {
     user: {
@@ -55,6 +62,14 @@ export const prisma = base.$extends({
         needs: { email: true },
         compute(user) {
           return user.email == null ? null : decryptField(user.email);
+        },
+      },
+    },
+    invitation: {
+      email: {
+        needs: { email: true },
+        compute(invitation) {
+          return invitation.email == null ? null : decryptField(invitation.email);
         },
       },
     },
