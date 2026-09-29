@@ -108,6 +108,7 @@ export function InvitationList() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Role</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Invitee</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Created By</th>
                     <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 sm:table-cell">Created</th>
                     <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 md:table-cell">Expires</th>
@@ -123,6 +124,11 @@ export function InvitationList() {
                       <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-4">
                           <Badge variant="gray">{inv.role.name}</Badge>
+                        </td>
+                        <td className="px-4 py-4 text-sm">
+                          {inv.email
+                            ? <span className="text-gray-900 break-all">{inv.email}</span>
+                            : <span className="italic text-gray-400">Any account</span>}
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-900">
                           {inv.createdBy?.name

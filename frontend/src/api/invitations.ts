@@ -17,6 +17,8 @@ export interface Invitation {
   applicationId: string
   roleId: string
   redirectUri: string | null
+  // Only a sign-in reporting this email can accept the invitation; null = any account.
+  email: string | null
   expiresAt: string
   usedAt: string | null
   createdAt: string
@@ -35,6 +37,8 @@ export interface CreateInvitationPayload {
   applicationId: string
   roleId: string
   redirectUri?: string
+  // Required for the Bouncer portal, optional otherwise.
+  email?: string
 }
 
 export const getInvitations = () =>

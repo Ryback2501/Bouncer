@@ -27,6 +27,7 @@ function inv(overrides: Partial<Invitation>): Invitation {
     createdBy: { name: 'Test Admin', email: 'admin@test.com' },
     createdByApiKeyId: null,
     createdByApiKeyLabel: null,
+    email: null,
     application: { id: 'app-1', name: 'Bouncer', customId: 'bouncer' },
     role: { id: 'role-1', name: 'Admin', customId: 'admin' },
     ...overrides,
@@ -78,6 +79,17 @@ describe('InvitationList', () => {
     ])
     renderPage()
     await waitFor(() => expect(screen.getByText('API key')).toBeInTheDocument())
+  })
+
+  // B-19: the list says who may accept each invitation.
+  it('shows the bound invitee email, or that any account may accept', async () => {
+    vi.mocked(getInvitations).mockResolvedValue([
+      inv({ id: 'i-bound', email: 'new.admin@example.com' }),
+      inv({ id: 'i-open', email: null }),
+    ])
+    renderPage()
+    await waitFor(() => expect(screen.getByText('new.admin@example.com')).toBeInTheDocument())
+    expect(screen.getByText('Any account')).toBeInTheDocument()
   })
 
   it('shows the empty state and a create button when there are no invitations', async () => {

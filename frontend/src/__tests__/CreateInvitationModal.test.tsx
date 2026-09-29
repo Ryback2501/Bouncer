@@ -52,7 +52,7 @@ describe('CreateInvitationModal', () => {
     ])
     vi.mocked(createInvitation).mockResolvedValue({
       id: 'i1', applicationId: 'app-2', roleId: 'role-1', redirectUri: null,
-      expiresAt: '', usedAt: null, createdAt: '', createdBy: null, createdByApiKeyId: null, createdByApiKeyLabel: null,
+      expiresAt: '', usedAt: null, createdAt: '', createdBy: null, createdByApiKeyId: null, createdByApiKeyLabel: null, email: null,
       application: { id: 'app-2', name: 'CMS', customId: 'cms' },
       role: { id: 'role-1', name: 'Editor', customId: 'editor' },
       inviteUrl: 'http://localhost/invite/abc',
@@ -71,6 +71,60 @@ describe('CreateInvitationModal', () => {
     }))
   })
 
+  // B-19: a portal invitation must name its invitee; others may.
+  const portalSetup = () => {
+    vi.mocked(getApplications).mockResolvedValue([
+      { id: 'app-1', name: 'Bouncer', customId: 'bouncer', redirectUris: [], createdAt: '', updatedAt: '' },
+    ])
+    vi.mocked(getRoles).mockResolvedValue([
+      { id: 'role-a', name: 'Admin', customId: 'admin', applicationId: 'app-1', createdAt: '' },
+    ])
+    vi.mocked(createInvitation).mockResolvedValue({
+      id: 'i2', applicationId: 'app-1', roleId: 'role-a', redirectUri: null, email: 'new.admin@example.com',
+      expiresAt: '', usedAt: null, createdAt: '', createdBy: null, createdByApiKeyId: null, createdByApiKeyLabel: null,
+      application: { id: 'app-1', name: 'Bouncer', customId: 'bouncer' },
+      role: { id: 'role-a', name: 'Admin', customId: 'admin' },
+      inviteUrl: 'http://localhost/invite#abc',
+    })
+  }
+
+  it('requires the invitee email for a portal invitation', async () => {
+    portalSetup()
+    renderModal()
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Admin' })).toBeInTheDocument())
+    fireEvent.change(screen.getByLabelText(/^role/i), { target: { value: 'role-a' } })
+    fireEvent.click(screen.getByRole('button', { name: /create invitation/i }))
+    await waitFor(() => expect(screen.getByText('Required for Bouncer portal invitations')).toBeInTheDocument())
+    expect(createInvitation).not.toHaveBeenCalled()
+  })
+
+  it('sends the email and says who can accept a 4-hour portal invitation', async () => {
+    portalSetup()
+    renderModal()
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Admin' })).toBeInTheDocument())
+    fireEvent.change(screen.getByLabelText(/^role/i), { target: { value: 'role-a' } })
+    fireEvent.change(screen.getByLabelText(/invitee email/i), { target: { value: ' new.admin@example.com ' } })
+    fireEvent.click(screen.getByRole('button', { name: /create invitation/i }))
+    await waitFor(() => expect(createInvitation).toHaveBeenCalledWith({
+      applicationId: 'app-1', roleId: 'role-a', redirectUri: undefined, email: 'new.admin@example.com',
+    }))
+    await waitFor(() => expect(screen.getByText(/expires in 4 hours/i)).toBeInTheDocument())
+    expect(screen.getByText(/only new\.admin@example\.com can accept it/i)).toBeInTheDocument()
+  })
+
+  it('lets an application invitation go out without an email', async () => {
+    vi.mocked(getApplications).mockResolvedValue([
+      { id: 'app-2', name: 'CMS', customId: 'cms', redirectUris: [], createdAt: '', updatedAt: '' },
+    ])
+    vi.mocked(getRoles).mockResolvedValue([
+      { id: 'role-1', name: 'Editor', customId: 'editor', applicationId: 'app-2', createdAt: '' },
+    ])
+    renderModal()
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Editor' })).toBeInTheDocument())
+    expect(screen.getByLabelText(/invitee email/i)).not.toBeRequired()
+    expect(screen.getByText(/optional — when set, only this email can accept/i)).toBeInTheDocument()
+  })
+
   it('shows the invite link after successful creation', async () => {
     vi.mocked(getApplications).mockResolvedValue([
       { id: 'app-2', name: 'CMS', customId: 'cms', redirectUris: [], createdAt: '', updatedAt: '' },
@@ -80,7 +134,7 @@ describe('CreateInvitationModal', () => {
     ])
     vi.mocked(createInvitation).mockResolvedValue({
       id: 'i1', applicationId: 'app-2', roleId: 'role-1', redirectUri: null,
-      expiresAt: '', usedAt: null, createdAt: '', createdBy: null, createdByApiKeyId: null, createdByApiKeyLabel: null,
+      expiresAt: '', usedAt: null, createdAt: '', createdBy: null, createdByApiKeyId: null, createdByApiKeyLabel: null, email: null,
       application: { id: 'app-2', name: 'CMS', customId: 'cms' },
       role: { id: 'role-1', name: 'Editor', customId: 'editor' },
       inviteUrl: 'http://localhost/invite/abc',
@@ -122,7 +176,7 @@ describe('CreateInvitationModal', () => {
     ])
     vi.mocked(createInvitation).mockResolvedValue({
       id: 'i1', applicationId: 'app-2', roleId: 'role-1', redirectUri: 'https://cms.example.com/welcome',
-      expiresAt: '', usedAt: null, createdAt: '', createdBy: null, createdByApiKeyId: null, createdByApiKeyLabel: null,
+      expiresAt: '', usedAt: null, createdAt: '', createdBy: null, createdByApiKeyId: null, createdByApiKeyLabel: null, email: null,
       application: { id: 'app-2', name: 'CMS', customId: 'cms' },
       role: { id: 'role-1', name: 'Editor', customId: 'editor' },
       inviteUrl: 'http://localhost/invite/abc',
