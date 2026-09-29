@@ -8,6 +8,7 @@ import { setupLinkedInStrategy } from "./linkedinStrategy";
 import { ensureBouncerDefaults, BOUNCER_APP_CUSTOM_ID, BOUNCER_ADMIN_ROLE_CUSTOM_ID } from "../lib/bouncerDefaults";
 import { config } from "../config";
 import { recordAudit, logAuditOnly, type AuditActor } from "../services/auditService";
+import { isAllowedRedirectUri } from "../lib/redirectUri";
 
 export async function configurePassport() {
   await ensureBouncerDefaults();
@@ -104,7 +105,7 @@ export async function findOrCreateUser(
       const tokenHash = createHash("sha256").update(inviteToken).digest("hex");
       const invitation = await tx.invitation.findFirst({
         where: { token: tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
-        include: { application: { select: { customId: true } }, role: { select: { customId: true } } },
+        include: { application: { select: { customId: true, redirectUris: true } }, role: { select: { customId: true } } },
       });
       if (!invitation) return null;
       // Bound to an invitee (B-19): only a sign-in reporting that email may use it. Refused without
@@ -112,6 +113,12 @@ export async function findOrCreateUser(
       if (invitation.email && invitation.email !== profile.email.trim().toLowerCase()) {
         return { mismatch: true as const };
       }
+      // The redirect was vetted against the application's allowlist when the invitation was minted;
+      // the allowlist may have changed since (e.g. a domain was retired). Re-check it now (B-21). If it
+      // no longer passes, the invitation is still honoured but the invitee lands on Bouncer's
+      // confirmation page instead of the stale URL.
+      const redirectAllowed =
+        !invitation.redirectUri || isAllowedRedirectUri(invitation.redirectUri, invitation.application.redirectUris ?? []);
 
       const user = await tx.user.upsert({
         where: { sub_provider: { sub: profile.sub, provider: profile.provider } },
@@ -167,11 +174,15 @@ export async function findOrCreateUser(
         outcome: {
           kind: isAdminInvite || keptRoleUsable ? "admin" : "app",
           viaInvite: true,
-          redirectUri: invitation.redirectUri,
+          redirectUri: redirectAllowed ? invitation.redirectUri : null,
           appCustomId: invitation.application.customId,
         },
       };
-      return { result, invitation: { id: invitation.id, applicationId: invitation.applicationId, roleId: invitation.roleId } };
+      return {
+        result,
+        invitation: { id: invitation.id, applicationId: invitation.applicationId, roleId: invitation.roleId },
+        redirectDropped: !redirectAllowed,
+      };
     });
     // Audited once the transaction has committed, so only a redemption that actually happened is recorded.
     if (!accepted) {
@@ -186,7 +197,11 @@ export async function findOrCreateUser(
       action: "invitation.redeem",
       actor: userActor(accepted.result.user, ip),
       target: { type: "invitation", id: accepted.invitation.id },
-      details: { applicationId: accepted.invitation.applicationId, roleId: accepted.invitation.roleId },
+      details: {
+        applicationId: accepted.invitation.applicationId,
+        roleId: accepted.invitation.roleId,
+        ...(accepted.redirectDropped && { redirectDropped: true }),
+      },
     });
     return accepted.result;
   }

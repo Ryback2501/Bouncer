@@ -196,6 +196,41 @@ describe('findOrCreateUser records its decision', () => {
     expect(logged).not.toContain('pat@example.com')
   })
 
+  // B-21: the redirect is re-checked against the application's allowlist as it is *now*, not as it
+  // was when the invitation was minted.
+  function appInviteTx(redirectUri: string, allowlist: string[]) {
+    return {
+      invitation: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'inv5', applicationId: 'app1', roleId: 'r1', redirectUri, email: null,
+          application: { customId: 'shop', redirectUris: allowlist }, role: { customId: 'editor' },
+        }),
+        update: vi.fn(),
+      },
+      user: { upsert: vi.fn().mockResolvedValue({ id: 'u5', name: 'Pat', isGlobalAdmin: false }) },
+      userRole: { upsert: vi.fn(), count: vi.fn() },
+    }
+  }
+
+  it('keeps a redirect that is still on the allowlist', async () => {
+    ptx.mockImplementation(async (cb: (t: unknown) => unknown) => cb(appInviteTx('https://shop.example.com/welcome', ['https://shop.example.com'])))
+    const result = await findOrCreateUser(profile, 'rawtoken', IP)
+    expect(result?.outcome).toMatchObject({ kind: 'app', redirectUri: 'https://shop.example.com/welcome' })
+    expect(audit.mock.calls[0][0].details).toEqual({ applicationId: 'app1', roleId: 'r1' })
+  })
+
+  it('drops a redirect removed from the allowlist since minting, but still accepts the invitation', async () => {
+    const tx = appInviteTx('https://old.example.com/welcome', ['https://shop.example.com'])
+    ptx.mockImplementation(async (cb: (t: unknown) => unknown) => cb(tx))
+    const result = await findOrCreateUser(profile, 'rawtoken', IP)
+    expect(result?.outcome).toMatchObject({ kind: 'app', redirectUri: null, appCustomId: 'shop' })
+    expect(tx.invitation.update).toHaveBeenCalled()
+    expect(audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'invitation.redeem',
+      details: { applicationId: 'app1', roleId: 'r1', redirectDropped: true },
+    }))
+  })
+
   it('invitation redeemed (after the transaction commits)', async () => {
     const tx = {
       invitation: {

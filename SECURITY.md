@@ -95,6 +95,10 @@ advisory. See `backend/.env.example` for the full list.
 
 - Single-use, stored only as a SHA-256 hash. **Portal (Bouncer admin) invitations expire after 4
   hours**, application invitations after 24.
+- **The redirect is checked twice**: against the application's allowlist when the invitation is
+  created, and again when it is accepted. A URI whose origin has been removed from the allowlist in
+  the meantime is not used — the invitation is still accepted and the invitee lands on Bouncer's
+  confirmation page (the audit event records `redirectDropped`).
 - **The token never reaches a server.** It is carried in the URL **fragment**
   (`https://…/invite#<token>`), which browsers do not transmit, so it appears in no access log —
   Bouncer's, the reverse proxy's, or any CDN's. The admin portal sends it onward in a request body,
