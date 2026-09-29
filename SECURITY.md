@@ -112,11 +112,13 @@ advisory. See `backend/.env.example` for the full list.
   other sign-in is refused and the invitation stays unused for the rightful invitee. The address is
   encrypted at rest like `User.email`. Portal invitations require it; application invitations (admin
   UI or `POST /api/v1/invitations`, field `email`) may set it.
-- **Binding trusts the email the provider reports.** Bouncer does not require a provider-verified
-  email. Google, GitHub and LinkedIn only report addresses their users control, but Microsoft with
-  the default `MICROSOFT_TENANT_ID=common` accepts any Azure AD tenant, whose administrators can set
-  an account's email to anything ("nOAuth") — so a bound invitation is **not** protected against a
-  Microsoft sign-in there. Set `MICROSOFT_TENANT_ID` to your own tenant ID if you enable Microsoft.
+- **Binding trusts the email the provider reports** (a deliberate choice: Bouncer does not require a
+  provider-verified email). Two consequences: with the default `MICROSOFT_TENANT_ID=common`, any
+  Azure AD tenant can sign in and its administrators can set an account's email to anything
+  ("nOAuth"); and a GitHub account's primary email may be unverified. A leaked bound link is
+  therefore **not** protected against such a sign-in. If you enable Microsoft, set
+  `MICROSOFT_TENANT_ID` to your own tenant ID. Requiring a provider-verified email (and refusing
+  bound invitations when the provider cannot vouch for it) is the stricter alternative.
 - **An unbound invite link is a bearer credential — treat it like a password reset link.** Anyone
   holding it can redeem it. In particular, a tenant administrator who can mint invitations for their
   own application can send one to a Bouncer administrator and, if that person accepts it, have them
