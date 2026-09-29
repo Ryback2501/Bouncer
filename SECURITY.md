@@ -24,7 +24,7 @@ built-in protections and what an operator must do to deploy it safely.
 |---|---|
 | `SESSION_SECRET` | ≥ 32 chars. Generate: `openssl rand -base64 48`. |
 | `CSRF_SECRET` | ≥ 32 chars and **different from `SESSION_SECRET`**: CSRF tokens and session cookies are signed with independent keys. Generate: `openssl rand -base64 48`. |
-| `ADMIN_ALLOWED_EMAILS` | Non-empty. Comma-separated emails permitted to **bootstrap the first global admin** — closes the "first OAuth sign-in wins admin" race. |
+| `ADMIN_ALLOWED_EMAILS` | Non-empty. Comma-separated emails permitted to **bootstrap the first global admin** — closes the "first OAuth sign-in wins admin" race. The bootstrap is atomic (an advisory-locked transaction) and the database admits a single global admin (partial unique index), so simultaneous first sign-ins cannot both win. |
 | `ENCRYPTION_KEY` | Base64-encoded 32-byte key for encrypting PII at rest. Generate: `openssl rand -base64 32`. |
 
 It also warns (without refusing) when no OAuth provider (`*_CLIENT_ID` + `*_CLIENT_SECRET`) is
@@ -167,7 +167,8 @@ page (`GET /admin/audit`); each is also a structured log line with `audit: true`
   email addresses.
 - **Log only, not stored:** rejections anyone can trigger without credentials — unknown / expired /
   portal API keys, requests without an admin session, bad CSRF tokens, and sign-ins by a stranger
-  (`auth.login_rejected`: `not_invited`, `not_allowlisted`, `invalid_invitation`) — so the table
+  (`auth.login_rejected`: `not_invited`, `not_allowlisted`, `invalid_invitation`,
+  `invite_email_mismatch`, `bootstrap_taken`) — so the table
   cannot be grown on demand. Collect the structured logs if you need those.
 - **Retention:** `AUDIT_RETENTION_DAYS` (default 90); older events are pruned at startup and daily.
   Rows have no foreign keys, so an event outlives the user, key or application it mentions.
