@@ -14,6 +14,7 @@ export const LIMITS = {
   search: 200,
   inviteToken: 256,
   id: 64,
+  email: 320,
 } as const;
 
 export const nameField = z.string().min(1).max(LIMITS.name);
@@ -23,4 +24,6 @@ export const providerField = z.string().min(1).max(LIMITS.provider);
 export const labelField = z.string().min(1).max(LIMITS.label);
 export const urlField = z.string().url().max(LIMITS.url);
 export const idField = z.string().min(1).max(LIMITS.id);
+// Normalised so comparisons (e.g. an invitation bound to an email, B-19) are case-insensitive.
+export const emailField = z.string().trim().toLowerCase().email().max(LIMITS.email);
 export const redirectUrisField = z.array(urlField).max(LIMITS.redirectUris);

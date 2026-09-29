@@ -93,7 +93,8 @@ advisory. See `backend/.env.example` for the full list.
 
 ## Invitation links
 
-- Single-use, 24-hour expiry, stored only as a SHA-256 hash.
+- Single-use, stored only as a SHA-256 hash. **Portal (Bouncer admin) invitations expire after 4
+  hours**, application invitations after 24.
 - **The token never reaches a server.** It is carried in the URL **fragment**
   (`https://…/invite#<token>`), which browsers do not transmit, so it appears in no access log —
   Bouncer's, the reverse proxy's, or any CDN's. The admin portal sends it onward in a request body,
@@ -106,11 +107,23 @@ advisory. See `backend/.env.example` for the full list.
   provider on that page. Viewing a forwarded link therefore cannot make an unrelated later sign-in
   redeem it. One invitation is held at a time, so choosing a provider on a second invite replaces the
   first.
-- **An invite link is a bearer credential — treat it like a password reset link.** Anyone holding it
-  can redeem it, and nothing binds it to the intended recipient's identity. In particular, a tenant
-  administrator who can mint invitations for their own application can send one to a Bouncer
-  administrator and, if that person accepts it, have them enrolled in that application and role.
-  Acceptance is always an explicit action on the invite page, but it is not otherwise restricted.
+- **Invitations can be bound to the invitee's email — and portal invitations always are.** Only an
+  OAuth sign-in whose reported email matches (case-insensitively) can redeem a bound invitation; any
+  other sign-in is refused and the invitation stays unused for the rightful invitee. The address is
+  encrypted at rest like `User.email`. Portal invitations require it; application invitations (admin
+  UI or `POST /api/v1/invitations`, field `email`) may set it.
+- **Binding trusts the email the provider reports** (a deliberate choice: Bouncer does not require a
+  provider-verified email). Two consequences: with the default `MICROSOFT_TENANT_ID=common`, any
+  Azure AD tenant can sign in and its administrators can set an account's email to anything
+  ("nOAuth"); and a GitHub account's primary email may be unverified. A leaked bound link is
+  therefore **not** protected against such a sign-in. If you enable Microsoft, set
+  `MICROSOFT_TENANT_ID` to your own tenant ID. Requiring a provider-verified email (and refusing
+  bound invitations when the provider cannot vouch for it) is the stricter alternative.
+- **An unbound invite link is a bearer credential — treat it like a password reset link.** Anyone
+  holding it can redeem it. In particular, a tenant administrator who can mint invitations for their
+  own application can send one to a Bouncer administrator and, if that person accepts it, have them
+  enrolled in that application and role. Acceptance is always an explicit action on the invite page,
+  but it is not otherwise restricted.
 
 ## Application security
 

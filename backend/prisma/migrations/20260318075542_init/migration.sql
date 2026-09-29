@@ -56,6 +56,7 @@ CREATE TABLE "Invitation" (
     "applicationId" TEXT NOT NULL,
     "roleId" TEXT NOT NULL,
     "redirectUri" TEXT,
+    "email" TEXT,
     "createdById" TEXT,
     "createdByApiKeyId" TEXT,
     "createdByApiKeyLabel" TEXT,

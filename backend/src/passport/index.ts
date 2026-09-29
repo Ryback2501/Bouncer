@@ -103,6 +103,11 @@ export async function findOrCreateUser(
         include: { application: { select: { customId: true } }, role: { select: { customId: true } } },
       });
       if (!invitation) return null;
+      // Bound to an invitee (B-19): only a sign-in reporting that email may use it. Refused without
+      // consuming it, so the rightful invitee can still accept.
+      if (invitation.email && invitation.email !== profile.email.trim().toLowerCase()) {
+        return { mismatch: true as const };
+      }
 
       const user = await tx.user.upsert({
         where: { sub_provider: { sub: profile.sub, provider: profile.provider } },
@@ -167,6 +172,10 @@ export async function findOrCreateUser(
     // Audited once the transaction has committed, so only a redemption that actually happened is recorded.
     if (!accepted) {
       await auditRejected("invalid_invitation", profile, ip);
+      return null;
+    }
+    if ("mismatch" in accepted) {
+      await auditRejected("invite_email_mismatch", profile, ip);
       return null;
     }
     await recordAudit({

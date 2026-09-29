@@ -71,6 +71,9 @@ model Invitation {
   roleId        String
   role          Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
   redirectUri   String?
+  // The invitee's email (B-19): only an OAuth sign-in reporting this address can redeem the invite.
+  // Required for portal invitations, optional for app ones. Encrypted at rest like User.email.
+  email         String?
   createdById   String?
   createdBy     User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
   // Which API key minted this invitation, when it came from /api/v1/invitations rather than an

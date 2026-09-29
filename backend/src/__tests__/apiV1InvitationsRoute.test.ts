@@ -84,6 +84,7 @@ describe('POST /api/v1/invitations', () => {
       redirectUri: 'https://app.example.com/welcome',
       createdByApiKeyId: 'k1',
       createdByApiKeyLabel: 'prod',
+      email: null,
     })
   })
 
@@ -94,7 +95,7 @@ describe('POST /api/v1/invitations', () => {
     expect(res.status).toBe(201)
     expect(inv.createInvitation).toHaveBeenCalledWith({
       applicationId: 'app1', roleId: 'r1', redirectUri: null,
-      createdByApiKeyId: 'k1', createdByApiKeyLabel: 'prod',
+      createdByApiKeyId: 'k1', createdByApiKeyLabel: 'prod', email: null,
     })
   })
 })

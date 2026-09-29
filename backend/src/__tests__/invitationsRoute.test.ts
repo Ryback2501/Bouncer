@@ -72,7 +72,11 @@ describe('GET /invitations', () => {
 })
 
 describe('POST /invitations', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // An ordinary (non-portal) application unless a test says otherwise.
+    p.application.findUnique.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000a01', customId: 'my-app', redirectUris: [] })
+  })
 
   it('creates an invitation for the given application + role and returns 201', async () => {
     p.role.findUnique.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000b01', applicationId: '00000000-0000-0000-0000-000000000a01' })
@@ -89,7 +93,50 @@ describe('POST /invitations', () => {
       roleId: '00000000-0000-0000-0000-000000000b01',
       createdById: 'u1',
       redirectUri: null,
+      email: null,
+      portal: false,
     })
+  })
+
+  // B-19: a portal invitation is only redeemable by the named invitee, so the email is mandatory.
+  it('requires the invitee email for a portal invitation', async () => {
+    p.role.findUnique.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000b01', applicationId: '00000000-0000-0000-0000-000000000a01' })
+    p.application.findUnique.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000a01', customId: 'bouncer', redirectUris: [] })
+    const res = await request(makeApp())
+      .post('/')
+      .send({ applicationId: '00000000-0000-0000-0000-000000000a01', roleId: '00000000-0000-0000-0000-000000000b01' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('email_required')
+    expect(svc.createInvitation).not.toHaveBeenCalled()
+  })
+
+  it('creates a portal invitation bound to the (normalised) invitee email', async () => {
+    p.role.findUnique.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000b01', applicationId: '00000000-0000-0000-0000-000000000a01' })
+    p.application.findUnique.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000a01', customId: 'bouncer', redirectUris: [] })
+    vi.mocked(svc.createInvitation).mockResolvedValue(mockInvitation as unknown as Awaited<ReturnType<typeof svc.createInvitation>>)
+    const res = await request(makeApp())
+      .post('/')
+      .send({ applicationId: '00000000-0000-0000-0000-000000000a01', roleId: '00000000-0000-0000-0000-000000000b01', email: '  New.Admin@Example.COM ' })
+    expect(res.status).toBe(201)
+    expect(svc.createInvitation).toHaveBeenCalledWith(expect.objectContaining({ email: 'new.admin@example.com', portal: true }))
+  })
+
+  it('accepts an optional email for an application invitation', async () => {
+    p.role.findUnique.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000b01', applicationId: '00000000-0000-0000-0000-000000000a01' })
+    vi.mocked(svc.createInvitation).mockResolvedValue(mockInvitation as unknown as Awaited<ReturnType<typeof svc.createInvitation>>)
+    const res = await request(makeApp())
+      .post('/')
+      .send({ applicationId: '00000000-0000-0000-0000-000000000a01', roleId: '00000000-0000-0000-0000-000000000b01', email: 'user@example.com' })
+    expect(res.status).toBe(201)
+    expect(svc.createInvitation).toHaveBeenCalledWith(expect.objectContaining({ email: 'user@example.com', portal: false }))
+  })
+
+  it('rejects an invalid email', async () => {
+    const res = await request(makeApp())
+      .post('/')
+      .send({ applicationId: '00000000-0000-0000-0000-000000000a01', roleId: '00000000-0000-0000-0000-000000000b01', email: 'not-an-email' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('validation_error')
   })
 
   it('returns 400 when the role does not belong to the application', async () => {
@@ -104,7 +151,7 @@ describe('POST /invitations', () => {
 
   it('returns 400 for a redirectUri whose origin is not in the application allowlist', async () => {
     p.role.findUnique.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000b01', applicationId: '00000000-0000-0000-0000-000000000a01' })
-    p.application.findUnique.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000a01', redirectUris: ['https://app.example.com'] })
+    p.application.findUnique.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000a01', customId: 'my-app', redirectUris: ['https://app.example.com'] })
 
     const res = await request(makeApp())
       .post('/')
