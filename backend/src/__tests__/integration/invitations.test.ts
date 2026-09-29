@@ -429,6 +429,30 @@ describe('email-bound invitations', () => {
   })
 })
 
+// B-21. The redirect is vetted at mint time and again at redemption, against the allowlist as it is
+// then: a URI removed from the application since is not used.
+describe('redirect re-validated at redemption', () => {
+  it('drops a redirect whose origin left the allowlist, but still accepts the invitation', async () => {
+    const shop = (await request(app).post('/admin/applications')
+      .send({ name: 'Shop', customId: `${PREFIX}-shop`, redirectUris: ['https://old-shop.example.com'] })).body
+    const role = (await request(app).post(`/admin/applications/${shop.id}/roles`).send({ name: 'Buyer', customId: 'buyer' })).body
+    const inv = (await request(app).post('/admin/invitations')
+      .send({ applicationId: shop.id, roleId: role.id, redirectUri: 'https://old-shop.example.com/welcome' })).body
+    expect(inv.redirectUri).toBe('https://old-shop.example.com/welcome')
+
+    // The admin retires the old domain after the link went out.
+    await request(app).patch(`/admin/applications/${shop.id}`).send({ redirectUris: ['https://shop.example.com'] })
+
+    const invitee = { sub: `${PREFIX}-buyer`, provider: 'google', name: 'Buyer', email: 'buyer@example.com' }
+    const accepted = await findOrCreateUser(invitee, inv.inviteUrl.split('#')[1])
+    expect(accepted?.outcome).toMatchObject({ kind: 'app', redirectUri: null, appCustomId: `${PREFIX}-shop` })
+    expect((await prisma.invitation.findUnique({ where: { id: inv.id } }))!.usedAt).not.toBeNull()
+
+    const ev = await prisma.auditEvent.findFirst({ where: { action: 'invitation.redeem', targetId: inv.id } })
+    expect(ev?.details).toMatchObject({ redirectDropped: true })
+  })
+})
+
 describe('GET /admin/invitations (cross-app listing)', () => {
   it('returns invitations across all applications with application + role includes', async () => {
     const res = await request(app).get('/admin/invitations')
