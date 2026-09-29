@@ -1,5 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // For User_single_global_admin (a partial unique index), B-20.
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -46,6 +48,10 @@ model User {
   updatedAt     DateTime     @updatedAt
 
   @@unique([sub, provider])
+
+  // At most one global admin, ever (B-20): the bootstrap is a one-time latch and nothing else sets
+  // the flag. The database enforces it, so concurrent first sign-ins cannot both win.
+  @@unique([isGlobalAdmin], map: "User_single_global_admin", where: raw("\"isGlobalAdmin\" = true"))
 }
 
 model UserRole {

@@ -9,7 +9,7 @@ import { createHash, randomBytes } from 'crypto'
 import { prisma } from '../../prisma'
 import { findOrCreateUser } from '../../passport'
 import { ensureBouncerDefaults } from '../../lib/bouncerDefaults'
-import { makeTestApp, testAdmin } from './testApp'
+import { makeTestApp, testAdmin, makeGlobalAdmin } from './testApp'
 
 const app = makeTestApp()
 const PREFIX = `int-invite-${randomBytes(4).toString('hex')}`
@@ -72,7 +72,9 @@ beforeAll(async () => {
       email: testAdmin.email!,
       sub: testAdmin.sub!,
       provider: testAdmin.provider!,
-      isGlobalAdmin: true,
+      // Only needed as an FK target; the database allows a single global admin (B-20), which the
+      // tests below create themselves when they need one.
+      isGlobalAdmin: false,
     },
   })
 })
@@ -279,9 +281,7 @@ describe('invitation acceptance (findOrCreateUser)', () => {
 describe('the global admin accepting a Bouncer invite for another role', () => {
   it('consumes the invite but keeps their portal admin role', async () => {
     const { app: bouncerApp, role: adminRole } = await ensureBouncerDefaults()
-    const owner = await prisma.user.create({
-      data: { name: 'Owner', sub: `${PREFIX}-owner`, provider: 'google', isGlobalAdmin: true },
-    })
+    const owner = await makeGlobalAdmin({ name: 'Owner', sub: `${PREFIX}-owner`, provider: 'google' })
     await prisma.userRole.create({
       data: { userId: owner.id, applicationId: bouncerApp.id, roleId: adminRole.id, active: true },
     })
@@ -312,9 +312,7 @@ describe('the global admin, portal role expired, accepting a Bouncer invite for 
   // the per-request check will then reject — the outcome follows the role they actually hold.
   it('keeps the role but does not claim a portal session', async () => {
     const { app: bouncerApp, role: adminRole } = await ensureBouncerDefaults()
-    const owner = await prisma.user.create({
-      data: { name: 'Owner 2', sub: `${PREFIX}-owner2`, provider: 'google', isGlobalAdmin: true },
-    })
+    const owner = await makeGlobalAdmin({ name: 'Owner 2', sub: `${PREFIX}-owner2`, provider: 'google' })
     await prisma.userRole.create({
       data: {
         userId: owner.id, applicationId: bouncerApp.id, roleId: adminRole.id, active: true,

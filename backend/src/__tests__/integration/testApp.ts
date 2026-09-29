@@ -4,7 +4,8 @@
  * session auth by injecting a test user directly onto req.user.
  */
 import express from 'express'
-import type { User } from '@prisma/client'
+import type { User, Prisma } from '@prisma/client'
+import { prisma } from '../../prisma'
 import adminRouter from '../../routes/admin'
 import accessRouter from '../../routes/api/v1/access'
 import apiInvitationsRouter from '../../routes/api/v1/invitations'
@@ -35,4 +36,13 @@ export function makeTestApp() {
   app.use('/api/v1/invitations', apiInvitationsRouter)
 
   return app
+}
+
+/**
+ * Create the one global admin a test needs. The database allows at most one (B-20, partial unique
+ * index User_single_global_admin), so the flag is first cleared on any other row — test DB only.
+ */
+export async function makeGlobalAdmin(data: Omit<Prisma.UserCreateInput, 'isGlobalAdmin'>) {
+  await prisma.user.updateMany({ where: { isGlobalAdmin: true }, data: { isGlobalAdmin: false } })
+  return prisma.user.create({ data: { ...data, isGlobalAdmin: true } })
 }

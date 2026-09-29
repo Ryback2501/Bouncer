@@ -34,33 +34,48 @@ const ptx = prisma.$transaction as unknown as ReturnType<typeof vi.fn>
 
 const profile = { sub: 'google:1', provider: 'google', name: 'X', email: 'Person@Example.com' }
 
+// The bootstrap transaction (B-20): advisory lock, then the latch check, then the create — all on the
+// same transaction client. `calls` records the order; `admins` is what the in-transaction count sees.
+let calls: string[]
+let admins: number
+let tx: {
+  $executeRaw: ReturnType<typeof vi.fn>
+  user: { count: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> }
+  userRole: { create: ReturnType<typeof vi.fn> }
+}
+
 describe('findOrCreateUser — admin bootstrap allowlist (H1)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockConfig.ADMIN_ALLOWED_EMAILS = []
     pu.findUnique.mockResolvedValue(null) // no existing user
-    pu.count.mockResolvedValue(0) // no global admin has ever existed → bootstrap path
     pur.count.mockResolvedValue(0)
-    ptx.mockImplementation(async (cb: (tx: unknown) => unknown) =>
-      cb({
-        user: { create: vi.fn().mockResolvedValue({ id: 'u1', isGlobalAdmin: true }) },
-        userRole: { create: vi.fn().mockResolvedValue({}) },
-      })
-    )
+    pu.count.mockResolvedValue(0) // fast path outside the lock sees an open latch
+    calls = []
+    admins = 0 // no global admin has ever existed → bootstrap path
+    tx = {
+      $executeRaw: vi.fn(async () => { calls.push('lock'); return 1 }),
+      user: {
+        count: vi.fn(async () => { calls.push('count'); return admins }),
+        create: vi.fn(async () => { calls.push('create'); return { id: 'u1', isGlobalAdmin: true } }),
+      },
+      userRole: { create: vi.fn().mockResolvedValue({}) },
+    }
+    ptx.mockImplementation(async (cb: (t: unknown) => unknown) => cb(tx))
   })
 
   it('rejects bootstrap when the email is not allowlisted', async () => {
     mockConfig.ADMIN_ALLOWED_EMAILS = ['allowed@example.com']
     const result = await findOrCreateUser({ ...profile, email: 'attacker@evil.com' })
     expect(result).toBeNull()
-    expect(ptx).not.toHaveBeenCalled() // never creates the admin
+    expect(tx.user.create).not.toHaveBeenCalled() // never creates the admin
   })
 
   it('allows bootstrap when the email is allowlisted (case-insensitive)', async () => {
     mockConfig.ADMIN_ALLOWED_EMAILS = ['person@example.com']
     const result = await findOrCreateUser(profile) // email is Person@Example.com
     expect(result?.outcome.kind).toBe('admin')
-    expect(ptx).toHaveBeenCalled()
+    expect(tx.user.create).toHaveBeenCalled()
   })
 
   it('allows bootstrap when no allowlist is set (dev convenience; prod requires it via config)', async () => {
@@ -73,10 +88,37 @@ describe('findOrCreateUser — admin bootstrap allowlist (H1)', () => {
   // assignments. Those can fall back to zero (the last admin's portal role removed), and a count
   // would then hand global admin to whoever signs in next.
   it('does not re-arm once a global admin exists, even with no admin assignment left', async () => {
-    pu.count.mockResolvedValue(1)
+    admins = 1
     pur.count.mockResolvedValue(0)
     const result = await findOrCreateUser(profile)
     expect(result).toBeNull()
+    expect(tx.user.create).not.toHaveBeenCalled()
+  })
+
+  // B-20: the latch is checked inside the creating transaction, after taking the bootstrap lock —
+  // never before it, or simultaneous first sign-ins could all see an open latch.
+  it('takes the lock, then re-checks the latch, then creates — in one transaction', async () => {
+    pu.count.mockResolvedValue(0)
+    await findOrCreateUser(profile)
+    expect(calls).toEqual(['lock', 'count', 'create'])
+  })
+
+  // Once bootstrapped, a stranger's sign-in must not queue on the bootstrap lock (a flood of them
+  // would otherwise tie up pooled connections): a plain count refuses it before any transaction.
+  it('refuses without taking the lock once a global admin exists', async () => {
+    pu.count.mockResolvedValue(1)
+    expect(await findOrCreateUser(profile)).toBeNull()
     expect(ptx).not.toHaveBeenCalled()
+    expect(calls).toEqual([])
+  })
+
+  it('refuses (instead of failing) when the database rejects a second global admin', async () => {
+    tx.user.create.mockRejectedValue(Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }))
+    expect(await findOrCreateUser(profile)).toBeNull()
+  })
+
+  it('does not swallow other database errors', async () => {
+    tx.user.create.mockRejectedValue(new Error('connection lost'))
+    await expect(findOrCreateUser(profile)).rejects.toThrow('connection lost')
   })
 })

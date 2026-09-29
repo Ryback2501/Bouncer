@@ -53,19 +53,24 @@ function expectNoEmail() {
   expect(JSON.stringify(audit.mock.calls)).not.toContain('pat@example.com')
 }
 
+// The bootstrap transaction (B-20): lock + latch check + create on one client; `admins` is what the
+// in-transaction count sees.
+let admins = 1
+function bootstrapTx(create = vi.fn().mockResolvedValue({ id: 'u1', name: 'Pat' })) {
+  return { $executeRaw: vi.fn().mockResolvedValue(1), user: { count: vi.fn(async () => admins), create }, userRole: { create: vi.fn() } }
+}
+
 describe('findOrCreateUser records its decision', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockConfig.ADMIN_ALLOWED_EMAILS = []
     pu.findUnique.mockResolvedValue(null)
-    pu.count.mockResolvedValue(1)
+    admins = 1
+    ptx.mockImplementation(async (cb: (t: unknown) => unknown) => cb(bootstrapTx()))
   })
 
   it('bootstrap: the first global admin', async () => {
-    pu.count.mockResolvedValue(0)
-    ptx.mockImplementation(async (cb: (tx: unknown) => unknown) =>
-      cb({ user: { create: vi.fn().mockResolvedValue({ id: 'u1', name: 'Pat' }) }, userRole: { create: vi.fn() } })
-    )
+    admins = 0
     await findOrCreateUser(profile, undefined, IP)
     expect(audit).toHaveBeenCalledWith({
       action: 'auth.bootstrap',
@@ -78,7 +83,7 @@ describe('findOrCreateUser records its decision', () => {
 
   // A stranger can trigger these at will (any OAuth account), so they are log lines, not rows.
   it('rejected: not on the bootstrap allowlist (log only)', async () => {
-    pu.count.mockResolvedValue(0)
+    admins = 0
     mockConfig.ADMIN_ALLOWED_EMAILS = ['someone-else@example.com']
     expect(await findOrCreateUser(profile, undefined, IP)).toBeNull()
     expect(audit).not.toHaveBeenCalled()
@@ -89,6 +94,21 @@ describe('findOrCreateUser records its decision', () => {
       details: { provider: 'google', sub: 'g-123', reason: 'not_allowlisted' },
     })
     expectNoEmail()
+  })
+
+  // B-20: another first sign-in won the race; the database index refused this one.
+  it('rejected: the bootstrap was taken concurrently (log only)', async () => {
+    admins = 0
+    const create = vi.fn().mockRejectedValue(Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }))
+    ptx.mockImplementation(async (cb: (t: unknown) => unknown) => cb(bootstrapTx(create)))
+    expect(await findOrCreateUser(profile, undefined, IP)).toBeNull()
+    expect(audit).not.toHaveBeenCalled()
+    expect(logOnly).toHaveBeenCalledWith({
+      action: 'auth.login_rejected',
+      outcome: 'denied',
+      actor: anonymous,
+      details: { provider: 'google', sub: 'g-123', reason: 'bootstrap_taken' },
+    })
   })
 
   it('rejected: an existing user without the portal role', async () => {

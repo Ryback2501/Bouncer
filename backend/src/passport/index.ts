@@ -55,6 +55,10 @@ export interface AcceptResult {
   outcome: AcceptOutcome;
 }
 
+// Advisory-lock key serialising first-admin bootstraps across concurrent requests and replicas
+// (distinct from the migration runner's key in lib/migrate.ts).
+const BOOTSTRAP_LOCK_KEY = 7_207_311;
+
 type SignInProfile = { sub: string; provider: string; name: string; email: string };
 
 // Audit helpers for sign-in (B-16). A user actor is id + display name, never the email; a rejected
@@ -216,16 +220,31 @@ export async function findOrCreateUser(
   // signs in next. `isGlobalAdmin` is set only here and the API cannot delete that user or clear
   // the flag, so once it exists the bootstrap never re-opens. The check itself reads no cached ids,
   // so a database reset under a running process cannot open it either.
-  const bootstrapped = await prisma.user.count({ where: { isGlobalAdmin: true } });
-  if (bootstrapped === 0) {
-    // Bootstrap guard: only allowlisted emails may become the first global admin. This closes
-    // the "first person to reach OAuth wins global admin" race. (Required in production via config.)
-    const allowlist = config.ADMIN_ALLOWED_EMAILS;
-    if (allowlist.length > 0 && !allowlist.includes(profile.email.toLowerCase())) {
-      await auditRejected("not_allowlisted", profile, ip);
-      return null;
-    }
-    const user = await prisma.$transaction(async (tx) => {
+  // Atomic (B-20): the check and the create run in one transaction holding an advisory lock, so
+  // simultaneous first sign-ins queue up and only the first finds the latch open — the others then
+  // see the admin and are refused like any uninvited stranger. The partial unique index
+  // User_single_global_admin is the database-level backstop should anything slip past the lock.
+  // Fast path, outside any transaction: once bootstrapped (the normal state), a stranger's sign-in
+  // is refused without queueing on the lock — a flood of them would otherwise tie up pooled
+  // connections. The locked transaction below re-checks, so this cannot open the latch twice.
+  if ((await prisma.user.count({ where: { isGlobalAdmin: true } })) > 0) {
+    await auditRejected("not_invited", profile, ip);
+    return null;
+  }
+  let bootstrap: { user: Express.User } | { reason: "not_invited" | "not_allowlisted" };
+  try {
+    bootstrap = await prisma.$transaction(async (tx) => {
+      // Transaction-scoped: released on commit or rollback. $executeRaw, not $queryRaw — the
+      // function returns `void`, which the query path cannot deserialise.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${BOOTSTRAP_LOCK_KEY})`;
+      const bootstrapped = await tx.user.count({ where: { isGlobalAdmin: true } });
+      if (bootstrapped > 0) return { reason: "not_invited" as const };
+      // Bootstrap guard: only allowlisted emails may become the first global admin. This closes
+      // the "first person to reach OAuth wins global admin" race. (Required via config.)
+      const allowlist = config.ADMIN_ALLOWED_EMAILS;
+      if (allowlist.length > 0 && !allowlist.includes(profile.email.toLowerCase())) {
+        return { reason: "not_allowlisted" as const };
+      }
       const created = await tx.user.create({
         data: {
           sub: profile.sub,
@@ -238,18 +257,27 @@ export async function findOrCreateUser(
       await tx.userRole.create({
         data: { userId: created.id, applicationId: bouncerApp.id, roleId: adminRole.id, active: true },
       });
-      return created;
+      return { user: created };
     });
-    await recordAudit({
-      action: "auth.bootstrap",
-      actor: userActor(user, ip),
-      target: { type: "user", id: user.id, label: user.name ?? null },
-      details: { provider: profile.provider },
-    });
-    return { user, outcome: { kind: "admin", viaInvite: false, redirectUri: null, appCustomId: bouncerApp.customId } };
+  } catch (err) {
+    // A unique violation here means someone else won (the single-admin index, or the same account's
+    // duplicate callback): refuse this sign-in rather than fail with a 500.
+    if ((err as { code?: string } | null)?.code === "P2002") {
+      await auditRejected("bootstrap_taken", profile, ip);
+      return null;
+    }
+    throw err;
   }
-
-  // Admins exist, no invitation token — reject (non-invited, non-admin sign-in).
-  await auditRejected("not_invited", profile, ip);
-  return null;
+  if ("reason" in bootstrap) {
+    await auditRejected(bootstrap.reason, profile, ip);
+    return null;
+  }
+  const { user } = bootstrap;
+  await recordAudit({
+    action: "auth.bootstrap",
+    actor: userActor(user, ip),
+    target: { type: "user", id: user.id, label: user.name ?? null },
+    details: { provider: profile.provider },
+  });
+  return { user, outcome: { kind: "admin", viaInvite: false, redirectUri: null, appCustomId: bouncerApp.customId } };
 }
