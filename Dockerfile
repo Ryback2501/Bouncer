@@ -78,5 +78,11 @@ COPY --from=frontend-builder /app/dist ./public
 USER node
 EXPOSE 3000
 
+# Container health (B-22): /health also checks the database. No curl in this image, so node does the
+# request (and reads $PORT itself, so no shell is needed). The start period covers migrations on
+# first boot.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+
 # Applies pending migrations itself on start (MIGRATE_ON_START, default true), then serves.
 CMD ["node", "dist/index.js"]

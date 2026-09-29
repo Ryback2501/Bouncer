@@ -51,6 +51,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # Hardening (B-22): the app only reads its files and needs no Linux capabilities, so the root
+    # filesystem is read-only (with a small writable /tmp), every capability is dropped, and the
+    # process can never gain privileges. The image's HEALTHCHECK reports whether it is serving.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   postgres_data:

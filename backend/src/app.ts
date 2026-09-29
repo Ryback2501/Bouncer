@@ -36,7 +36,14 @@ export function createApp() {
   // ── Request logging ───────────────────────────────────────────────────────
   // Serializers strip credentials from the logged URL, query and Location header: invitation
   // tokens (for links minted before they moved into the URL fragment) and OAuth code/state.
-  app.use(pinoHttp({ logger, serializers: { req: redactReq, res: redactRes } }));
+  // The container HEALTHCHECK probes /health every 30 s (B-22); leave those out of the request log.
+  app.use(
+    pinoHttp({
+      logger,
+      serializers: { req: redactReq, res: redactRes },
+      autoLogging: { ignore: (req) => req.url === "/health" },
+    })
+  );
 
   // ── No caching of API responses ───────────────────────────────────────────
   // Admin data, role decisions and CSRF tokens must never be stored by a shared cache (proxy, CDN)

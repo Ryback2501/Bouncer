@@ -78,6 +78,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # Hardening: read-only filesystem (writable /tmp only), no Linux capabilities, no privilege
+    # escalation. The image has a built-in health check (`docker ps` shows healthy/unhealthy).
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   postgres_data:
