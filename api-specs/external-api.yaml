@@ -14,7 +14,8 @@ info:
     ```
     Authorization: Bearer bncr_<key>
     ```
-    API keys are created in the Bouncer admin UI and are scoped to a single application.
+    API keys (`bncr_` followed by 64 hex characters) are created in the Bouncer admin UI, are
+    scoped to a single application, and are shown only once — Bouncer stores just a hash.
     A key may have an optional expiry; once past it, requests are rejected with
     `401 api_key_expired`.
 
@@ -22,26 +23,44 @@ info:
     1. A Bouncer admin registers your application (custom ID, allowed redirect URIs, roles)
        and issues an API key.
     2. When you want to grant access to a new end-user, mint an invitation via
-       `POST /api/v1/invitations` with the role's `customId` (and optionally a `redirectUri`).
-       Bouncer returns a single-use `inviteUrl`.
+       `POST /api/v1/invitations` with the role's `customId` (optionally a `redirectUri`, and
+       optionally the invitee's `email`). Bouncer returns a single-use `inviteUrl`, valid 24 hours.
     3. Deliver `inviteUrl` to the user — email, in-app message, whatever your product uses.
        Bouncer does not send it for you.
     4. The user opens `inviteUrl`, lands on a Bouncer-hosted page, and signs in with an OAuth
        provider. Bouncer creates (or finds) the user, assigns the requested role within your
        application, marks the invitation used, and redirects the browser to `redirectUri`
        (or to a Bouncer-hosted confirmation page if `redirectUri` was omitted).
+       - If the invitation names an `email`, only a sign-in whose provider reports that email
+         (case-insensitive) can accept it. Anyone else is refused, and the invitation stays
+         unused for the right person.
+       - `redirectUri` is checked against the application's allowlist again at this moment. If
+         its origin has been removed since the invitation was created, the invitation is still
+         accepted but the user lands on the confirmation page instead.
     5. From your backend, verify access on subsequent visits with
-       `GET /api/v1/access?sub=<sub>`. Pass `provider` too if the same `sub` could collide
-       across OAuth providers.
+       `GET /api/v1/access?sub=<sub>&provider=<provider>`. `provider` is always required.
 
     ## How the `sub` lines up
     Bouncer keys users on the OAuth `sub` claim of the provider they signed in with during
     invitation acceptance. The same `sub` your application receives from its own OAuth login
     is the value to send to `/api/v1/access` — that is how Bouncer recognises the user across
     the two systems.
+
+    ## Limits
+    - **Rate limits:** 300 requests per minute per API key, and — across the whole service —
+      500 requests per 15 minutes per client IP address. Above either limit Bouncer answers
+      `429` (a short text message, sent as `text/html`) with `RateLimit-*` and `Retry-After` headers.
+    - **Request bodies** larger than 100 KB are rejected with `413 payload_too_large`.
+    - **Field lengths** are bounded (see each parameter and field).
+    - **Caching:** every response carries `Cache-Control: no-store`.
   version: 0.3.0
+  license:
+    name: MIT
+    identifier: MIT
 
 servers:
+  - url: https://bouncer.example.com
+    description: Your Bouncer deployment (the address in its FRONTEND_URL setting)
   - url: http://localhost:3000
     description: Local development
 
@@ -93,7 +112,7 @@ components:
 
     ValidationError:
       type: object
-      description: Returned when query parameters fail validation (Zod).
+      description: Returned when query parameters or body fields fail validation.
       properties:
         error:
           type: string
@@ -122,16 +141,29 @@ components:
       properties:
         role:
           type: string
+          minLength: 1
+          maxLength: 100
           description: customId of a role within the application this API key belongs to.
           example: editor
         redirectUri:
           type: string
           format: uri
+          maxLength: 2048
           description: >-
             Where to send the user after they accept. Its origin must match one of the
-            application's registered redirect URIs (configured in the Bouncer admin UI). If
-            omitted, Bouncer shows a confirmation page.
+            application's registered redirect URIs (configured in the Bouncer admin UI) — checked
+            when the invitation is created and again when it is accepted. If omitted (or no longer
+            allowed at acceptance), Bouncer shows a confirmation page.
           example: "https://app.example.com/welcome"
+        email:
+          type: string
+          format: email
+          maxLength: 320
+          description: >-
+            Optional. The invitee's email address. When set, only a sign-in whose OAuth provider
+            reports this email (compared case-insensitively) can accept the invitation; any other
+            sign-in is refused and the invitation stays unused. Stored encrypted.
+          example: "ana@example.com"
 
     InvitationCreated:
       type: object
@@ -152,12 +184,51 @@ components:
           description: When the invitation expires (24h after creation).
           example: "2026-05-26T09:24:16.000Z"
 
+  responses:
+    TooManyRequests:
+      description: >-
+        Rate limit exceeded: 300 requests per minute for this API key, or 500 requests per
+        15 minutes from this client IP across the whole service. See the `RateLimit-*` headers.
+      headers:
+        RateLimit-Policy:
+          description: The limit that applied, e.g. `300;w=60`.
+          schema:
+            type: string
+        RateLimit-Limit:
+          schema:
+            type: integer
+        RateLimit-Remaining:
+          schema:
+            type: integer
+        RateLimit-Reset:
+          description: Seconds until the current window resets.
+          schema:
+            type: integer
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+      content:
+        text/html:
+          schema:
+            type: string
+          example: Too many requests, please try again later.
+    PayloadTooLarge:
+      description: Request body larger than 100 KB (`payload_too_large`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: payload_too_large
+
 security:
   - apiKey: []
 
 paths:
   /api/v1/access:
     get:
+      operationId: checkAccess
       summary: Check user access
       description: |
         Checks whether the user identified by `sub` + `provider` has an active,
@@ -165,16 +236,20 @@ paths:
 
         Possible outcomes:
         - **200** — user has an active role → returns role and application details.
-        - **400** — query validation failed (`sub` or `provider` missing or empty).
-        - **401** — API key is missing or invalid.
-        - **403** — user has a role but it is inactive or expired.
+        - **400** — query validation failed (`sub` or `provider` missing, empty or too long).
+        - **401** — API key is missing, invalid or expired.
+        - **403** — user has a role but it is inactive or expired (`role_inactive`), or the API
+          key belongs to the Bouncer admin portal's own application (`api_key_not_permitted`).
         - **404** — user not found, or user has no role in this application.
+        - **429** — rate limit exceeded.
       parameters:
         - in: query
           name: sub
           required: true
           schema:
             type: string
+            minLength: 1
+            maxLength: 255
           description: Subject identifier of the user (from the OAuth provider)
           example: "109876543210"
         - in: query
@@ -182,6 +257,8 @@ paths:
           required: true
           schema:
             type: string
+            minLength: 1
+            maxLength: 50
           description: |
             The provider the user signed in with (`google`, `microsoft`, `github` or
             `linkedin`). Always required: a `sub` is only unique within one provider, and
@@ -206,7 +283,7 @@ paths:
                   customId: editor
                   name: Editor
         '400':
-          description: Query parameters failed validation (`sub` or `provider` missing or empty)
+          description: Query parameters failed validation (`sub` or `provider` missing, empty or too long)
           content:
             application/json:
               schema:
@@ -251,9 +328,12 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: user_not_found
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /api/v1/invitations:
     post:
+      operationId: createInvitation
       summary: Create a user invitation
       description: |
         Mint a single-use invitation for the application associated with the API key. Deliver the
@@ -263,10 +343,15 @@ paths:
         confirmation page if omitted).
 
         Outcomes:
-        - **201** — invitation created.
-        - **400** — body validation failed, or `redirectUri`'s origin is not in the application's allowlist.
-        - **401** — API key is missing or invalid.
+        - **201** — invitation created (single use, valid 24 hours).
+        - **400** — body validation failed (`validation_error`), the body is not valid JSON
+          (`invalid_json`), or `redirectUri`'s origin is not in the application's allowlist
+          (`redirect_uri_not_allowed`).
+        - **401** — API key is missing, invalid or expired.
+        - **403** — the key belongs to the Bouncer admin portal's own application.
         - **404** — no role with that `customId` exists in this application.
+        - **413** — request body larger than 100 KB.
+        - **429** — rate limit exceeded.
       requestBody:
         required: true
         content:
@@ -284,15 +369,32 @@ paths:
                 inviteUrl: "http://localhost:5173/invite#3f1a9c0b...e9"
                 expiresAt: "2026-05-26T09:24:16.000Z"
         '400':
-          description: Validation failed, or redirect URI origin not in the application allowlist
+          description: >-
+            Body validation failed (`validation_error`, with `issues`), the body is not valid JSON
+            (`invalid_json`), or the redirect URI's origin is not in the application allowlist
+            (`redirect_uri_not_allowed`).
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                error: redirect_uri_not_allowed
+                anyOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - $ref: '#/components/schemas/Error'
+              examples:
+                redirectNotAllowed:
+                  value:
+                    error: redirect_uri_not_allowed
+                invalidJson:
+                  value:
+                    error: invalid_json
+                validation:
+                  value:
+                    error: validation_error
+                    issues:
+                      - code: invalid_string
+                        path: [email]
+                        message: Invalid email
         '401':
-          description: Missing or invalid API key
+          description: Missing, invalid, or expired API key (`invalid_api_key` | `api_key_expired`)
           content:
             application/json:
               schema:
@@ -317,3 +419,7 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: role_not_found
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
