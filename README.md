@@ -153,8 +153,9 @@ bash bash-scripts/runBouncer.sh
 ```
 
 `runBouncer.sh` builds the image and starts Bouncer and PostgreSQL. The first time, it creates
-`backend/.env` with new random secrets. Bouncer does **not** start yet: it still needs your email, so
-the script stops with an error about `ADMIN_ALLOWED_EMAILS`. That is expected. Then:
+`backend/.env` with new random secrets. Bouncer does **not** start yet, because it still needs your
+email: after about a minute the script says *"Stack did not become healthy"* and prints the logs, which
+mention `ADMIN_ALLOWED_EMAILS`. That is expected. Then:
 
 1. Open `backend/.env`. Set `ADMIN_ALLOWED_EMAILS` to your email, and fill in at least one sign-in
    provider (see [Set up sign-in providers](#set-up-sign-in-providers)).
@@ -275,7 +276,8 @@ LINKEDIN_CALLBACK_URL=http://localhost/auth/linkedin/callback
 ### Settings
 
 Bouncer reads its settings from environment variables. It **refuses to start** if a required setting is
-missing or too weak, and it says which one.
+missing or too weak, and it says which one. (Without any sign-in provider it does start, with a
+warning — but then nobody can sign in.)
 
 | Setting | Required? | What it is |
 |---|---|---|
@@ -285,7 +287,7 @@ missing or too weak, and it says which one.
 | `CSRF_SECRET` | yes | Random secret for form protection. At least 32 characters, different from `SESSION_SECRET`. |
 | `ENCRYPTION_KEY` | yes | Key that encrypts email addresses in the database (`openssl rand -base64 32`). Never change it. |
 | `ADMIN_ALLOWED_EMAILS` | yes | Emails allowed to become the first admin, separated by commas. |
-| `<PROVIDER>_CLIENT_ID`, `_CLIENT_SECRET`, `_CALLBACK_URL` | at least one provider | Sign-in providers: `GOOGLE`, `MICROSOFT`, `GITHUB`, `LINKEDIN`. |
+| `<PROVIDER>_CLIENT_ID`, `_CLIENT_SECRET`, `_CALLBACK_URL` | at least one, to sign in | Sign-in providers: `GOOGLE`, `MICROSOFT`, `GITHUB`, `LINKEDIN`. |
 | `MICROSOFT_TENANT_ID` | no | Your Microsoft tenant ID. Default `common` (see the warning above). |
 | `TRUST_PROXY` | no | Only if a proxy (for example Nginx or Traefik) is in front of Bouncer: the number of proxies (`1`, `2`…) or their IP range. `true` is not accepted. |
 | `PORT` | no | Port inside the container. Default `3000`. |
@@ -304,7 +306,7 @@ The full list, with notes, is in [`backend/.env.example`](backend/.env.example).
   proxy automatically. If you have more proxies, set `TRUST_PROXY`.
 - **Use a fixed version** of the image (`ryback2501/bouncer:<version>`) and update on purpose.
 - **Back up the database** regularly, for example:
-  `docker compose exec postgres pg_dump -U bouncer bouncer > bouncer-backup.sql`
+  `docker compose exec -T postgres pg_dump -U bouncer bouncer > bouncer-backup.sql`
 - **Keep your secrets safe**, especially `ENCRYPTION_KEY`.
 - Read [SECURITY.md](SECURITY.md) for all security settings.
 
@@ -346,6 +348,7 @@ Bouncer answers:
 | `403` `role_inactive` | The person has a role, but it is switched off or has ended (`expiredAt` says when). |
 | `400` `validation_error` | `sub` or `provider` is missing or too long. |
 | `401` `invalid_api_key` / `api_key_expired` | The API key is wrong, deleted, or past its end date. |
+| `403` `api_key_not_permitted` | The API key belongs to the Bouncer application itself. Use a key of your own application. |
 
 Example of a `200` answer:
 
@@ -425,8 +428,11 @@ The repository has three parts:
    `127.0.0.1:5432`, and `backend/.env` already points to it).
 2. Backend: `cd backend && npm install && npx prisma generate && npm run dev` → API on `http://localhost:3000`.
 3. Frontend: `cd frontend && npm install && npm run dev` → website on `http://localhost:5173`. It forwards
-   `/auth`, `/admin` and `/api` to the backend. To sign in here, set `FRONTEND_URL` and the provider
-   callback URLs to `http://localhost:5173` in `backend/.env`.
+   `/auth`, `/admin` and `/api` to the backend.
+4. To sign in on `http://localhost:5173`: add `http://localhost:5173/auth/<provider>/callback` to your
+   provider app, and set `FRONTEND_URL` and the `*_CALLBACK_URL` settings to `http://localhost:5173` in
+   `backend/.env`. The Docker version reads the same file, so set them back to `http://localhost` before
+   you use `runBouncer.sh` again.
 
 **Tests:**
 

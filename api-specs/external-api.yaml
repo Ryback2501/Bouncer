@@ -49,7 +49,7 @@ info:
     ## Limits
     - **Rate limits:** 300 requests per minute per API key, and — across the whole service —
       500 requests per 15 minutes per client IP address. Above either limit Bouncer answers
-      `429` (plain-text body) with standard `RateLimit-*` headers.
+      `429` (a short text message, sent as `text/html`) with `RateLimit-*` and `Retry-After` headers.
     - **Request bodies** larger than 100 KB are rejected with `413 payload_too_large`.
     - **Field lengths** are bounded (see each parameter and field).
     - **Caching:** every response carries `Cache-Control: no-store`.
@@ -190,6 +190,10 @@ components:
         Rate limit exceeded: 300 requests per minute for this API key, or 500 requests per
         15 minutes from this client IP across the whole service. See the `RateLimit-*` headers.
       headers:
+        RateLimit-Policy:
+          description: The limit that applied, e.g. `300;w=60`.
+          schema:
+            type: string
         RateLimit-Limit:
           schema:
             type: integer
@@ -200,8 +204,12 @@ components:
           description: Seconds until the current window resets.
           schema:
             type: integer
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
       content:
-        text/plain:
+        text/html:
           schema:
             type: string
           example: Too many requests, please try again later.
@@ -230,7 +238,8 @@ paths:
         - **200** — user has an active role → returns role and application details.
         - **400** — query validation failed (`sub` or `provider` missing, empty or too long).
         - **401** — API key is missing, invalid or expired.
-        - **403** — user has a role but it is inactive or expired.
+        - **403** — user has a role but it is inactive or expired (`role_inactive`), or the API
+          key belongs to the Bouncer admin portal's own application (`api_key_not_permitted`).
         - **404** — user not found, or user has no role in this application.
         - **429** — rate limit exceeded.
       parameters:
